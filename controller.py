@@ -52,8 +52,6 @@ def main():
         cffirmware.controllerSJC(control, setpoint, sensors, state, 0)
         full_state = np.concatenate((full_state, uav1.state.reshape(1,13)))
         
-        # result is in the following variables (units: N and Nm)
-        # print(control.thrustSI, control.torque)
 
     full_state = np.delete(full_state, 0, 0)
     fig     = plt.figure(figsize=(10,10))
