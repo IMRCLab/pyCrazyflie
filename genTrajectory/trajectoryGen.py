@@ -42,15 +42,15 @@ elif(type_traj in 'inf'):
     data[3,:]  =  height
     pieces = 25
 else:
-    x0 = 0
-    xf = 0.5
-    T = 2
+    x0 = 0.7
+    xf = 1.7
+    T = 8
     time = np.arange(0,T,1e-3)
     data = np.empty((4,time.size))
     dt = 1e-3
     data[0,:] = time
-    data[2,:] = x0 + ((time/time[-1])*(xf - x0))
-    pieces = 4 
+    data[3,:] = x0 + ((time/time[-1])*(xf - x0))
+    pieces = 20 
 ################################################################################################################################################
 ## Define the number of splines
 n_waypoints = pieces + 1 #number of waypoints
@@ -263,11 +263,10 @@ for i in range(0,n,8):
 
 
 fpath = Path(os.getcwd())
-print(fpath)
 filename = type_traj+'.csv'
-# fpathParent = str(fpath.parent) + filename
-# print(fpathParent)
-np.savetxt(filename, fulltraj, delimiter=',')
+fpathParent = str(fpath.parent) + '/trajectoriescsv/' + filename
+print(fpathParent)
+np.savetxt(fpathParent, fulltraj, delimiter=',')
 fig = plt.figure(figsize=(10,10))
 ax  = fig.add_subplot(autoscale_on=True,projection="3d")
 trajspline = ax.plot(postraj[1,:],postraj[2,:],postraj[3,:],'k',lw=2,label="7th order Spline Trajectory")

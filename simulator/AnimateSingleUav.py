@@ -18,7 +18,7 @@ class PlotandAnimate:
         self.fig = fig#plt.figure(figsize=(10,10))
         self.ax  = ax#self.fig.add_subplot(autoscale_on=True,projection="3d")
         # self.ax.view_init(25, 35)
-        self.ax.view_init(0, 0)
+        self.ax.view_init(25, 35)
         # Create the lines and vectors to draw body and desired frames
         self.line, = self.ax.plot(self.full_state[0,0:1], self.full_state[1,0:1], self.full_state[2,0:1], 'b--', lw=1)
         self.vec1  = self.ax.quiver([],[],[],[],[],[])

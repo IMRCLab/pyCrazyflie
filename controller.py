@@ -3,10 +3,23 @@ import sys
 import os
 import numpy as np
 path = os.path
+sys.path.append('uavDy')
+sys.path.append('Utilities')
+sys.path.append('simulator')
+sys.path.append('genTrajectory')
+sys.path.append('crazyflie-firmware')
+
+#!/usr/bin/env python
+import sys
+import os
+import numpy as np
+path = os.path
 sys.path.append('uavDy/')
 sys.path.append('Utilities/')
 sys.path.append('simulator/')
-sys.path.append('genTrajectory')
+sys.path.append('genTrajectory/')
+sys.path.append('trajectoriescsv/')
+sys.path.append('crazyflie-firmware/')
 
 import cffirmware
 import uav
@@ -17,7 +30,7 @@ from mpl_toolkits import mplot3d
 import matplotlib.animation as animation
 from initialize import initState, dt
 from AnimateSingleUav import PlotandAnimate
-
+import time
 def main():
     # Initialize an instance of a uav dynamic model with:
     # dt: time interval
@@ -28,7 +41,7 @@ def main():
     uav1.m = 0.034 
     # Upload the traj in csv file format
     # rows: time, xdes, ydes, zdes
-    filename = "lin.csv"
+    filename = "trajectoriescsv/lin.csv"
     timeStamped_traj = np.genfromtxt(filename, delimiter=',')
     # final time of traj in ms
     tf_ms = timeStamped_traj[0,-1]*1e3
@@ -61,7 +74,7 @@ def main():
 
     animateAndSave = False
     if animateAndSave:
-        videoname  = 'traj_.mp4' 
+        videoname  = 'traj_lin.mp4' 
         dt_sampled = dt * sample
         show       = False
         save       = True
@@ -117,8 +130,8 @@ def updateDesState(tick, setpoint, fulltraj):
     return setpoint
 
 def updateSensor(sensors,uavState):
-    sensors.gyro.x = -uavState[10] # deg/s
-    sensors.gyro.y = uavState[11] # deg/s # WARNING: THIS LIKELY NEEDS TO BE INVERTED
+    sensors.gyro.x = uavState[10] # deg/s
+    sensors.gyro.y = -uavState[11] # deg/s # WARNING: THIS LIKELY NEEDS TO BE INVERTED
     sensors.gyro.z = uavState[12] # deg/s
     return sensors
 
