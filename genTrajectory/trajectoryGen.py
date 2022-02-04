@@ -43,7 +43,7 @@ elif(type_traj in 'inf'):
     pieces = 25
 else:
     x0 = 0.7
-    xf = 1.7
+    xf = 3
     T = 8
     time = np.arange(0,T,1e-3)
     data = np.empty((4,time.size))

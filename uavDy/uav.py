@@ -14,7 +14,7 @@ class UavModel:
 
         def __init__(self,dt ,state):
             self.m      = 0.034  
-            self.I      = np.array([[16.571710, 0, 0],[0, 16.571710, 0],[0, 0, 29.261652]])* 1e-6 
+            self.I      = np.array([[16.571710, 0, 0],[0, 16.655602, 0],[0, 0, 29.261652]])* 1e-6 
             self.invI   = linalg.inv(self.I)
             self.d      = 4e-3
             self.cft    = 0.005964552 

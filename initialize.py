@@ -2,12 +2,12 @@ import numpy as np
 from rowan import from_matrix, to_matrix 
 from utils import Rx, Ry, Rz
 
-dt = 1e-3
+dt = 0.002
 initPos = np.array([0,0,0.7])
 initR = np.eye(3)
 # initialize Rotation matrix about Roll-Pitch-Yaw
-angle = [0,0,0]
-initR   = Rz((np.pi/180)*angle[2]) @ Ry((np.pi/180)*angle[1]) @ Rx((np.pi/180)*angle[0])
+iangle = [0,0,0]
+initR   = Rz((np.pi/180)*iangle[2]) @ Ry((np.pi/180)*iangle[1]) @ Rx((np.pi/180)*iangle[0])
 initq = from_matrix(initR)
 #Initialize Twist
 initTwist = np.zeros((6,))
