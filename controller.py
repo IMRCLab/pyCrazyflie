@@ -2,6 +2,7 @@
 import sys
 import os
 import numpy as np
+from rowan import to_euler
 path = os.path
 sys.path.append('uavDy')
 sys.path.append('Utilities')
@@ -131,7 +132,7 @@ def updateDesState(tick, setpoint, fulltraj):
 
 def updateSensor(sensors,uavState):
     sensors.gyro.x = uavState[10] # deg/s
-    sensors.gyro.y = -uavState[11] # deg/s # WARNING: THIS LIKELY NEEDS TO BE INVERTED
+    sensors.gyro.y = uavState[11] # deg/s # WARNING: THIS LIKELY NEEDS TO BE INVERTED
     sensors.gyro.z = uavState[12] # deg/s
     return sensors
 
@@ -142,11 +143,11 @@ def updateState(state, uavState):
     state.velocity.x = uavState[3]    # m/s
     state.velocity.y = uavState[4]    # m/s
     state.velocity.z = uavState[5]    # m/s
-
-    state.attitudeQuaternion.w = uavState[6]
-    state.attitudeQuaternion.x = uavState[7]
-    state.attitudeQuaternion.y = uavState[8]
-    state.attitudeQuaternion.z = uavState[9]
+    q_curr = np.array(uavState[6:10]).reshape((4,))
+    rpy_state  = to_euler(q_curr)
+    state.attitude.roll  = rpy_state[0]
+    state.attitude.pitch = -rpy_state[1]
+    state.attitude.yaw   = rpy_state[2]
 
     state.acc.x = 0   # Gs
     state.acc.y = 0  # Gs
