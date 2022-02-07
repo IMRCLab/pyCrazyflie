@@ -163,8 +163,3 @@ def main():
 if __name__ == '__main__':
 	main()
 
-
-
-#   // qr = mkvec(radians(setpoint->attitude.roll),
-#             //     radians(setpoint->attitude.pitch), // This is in the legacy coordinate system where pitch is inverted
-#             //       radians(setpoint->attitude.yaw));
