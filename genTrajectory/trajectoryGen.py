@@ -13,7 +13,7 @@ np.set_printoptions(linewidth=np.inf)
 np.set_printoptions(suppress=True)
 
 # Problem data.
-type_traj = 'lin'
+type_traj = 'inf'
 if type_traj in 'helix':
     ## WayPoints for cirle trajectory
     r = 1
@@ -31,7 +31,7 @@ if type_traj in 'helix':
 elif(type_traj in 'inf'):
     ## Waypoints for infinity trajectory
     height = 0.7
-    w = 0.2 * np.pi
+    w = 0.35* 0.2 * np.pi
     T = (2*np.pi)/w
     time = np.arange(0,T,1e-3)
     print('dt = ',time[1]-time[0])
@@ -40,16 +40,17 @@ elif(type_traj in 'inf'):
     data[1,:]  =  np.sin(w*time)
     data[2,:]  =  np.sin(2*w*time)
     data[3,:]  =  height
-    pieces = 25
+    pieces = 30
 else:
-    x0 = 0.7
-    xf = 3
-    T = 8
+    x0 = 0
+    xf = 0.5
+    T = 10
     time = np.arange(0,T,1e-3)
     data = np.empty((4,time.size))
     dt = 1e-3
     data[0,:] = time
-    data[3,:] = x0 + ((time/time[-1])*(xf - x0))
+    data[1,:] = x0 + ((time/time[-1])*(xf - x0))
+    data[3,:] = 0.7
     pieces = 20 
 ################################################################################################################################################
 ## Define the number of splines
@@ -232,7 +233,7 @@ postraj  = np.zeros((4,step*pieces))
 veltraj  = np.zeros((4,step*pieces))
 acctraj  = np.zeros((4,step*pieces))
 jerktraj = np.zeros((4,step*pieces))
-fulltraj = np.zeros((12,step*pieces))
+fulltraj = np.zeros((10,step*pieces))
 
 postraj[0,:]  = time[:(step*pieces)]
 veltraj[0,:]  = time[:(step*pieces)]
@@ -256,8 +257,11 @@ for i in range(0,n,8):
     veltraj[1:,stepInd:stepInd+step]  = np.array([vxpoly(time_hk),vypoly(time_hk),vzpoly(time_hk)]).reshape(3,len(time_hk))
     acctraj[1:,stepInd:stepInd+step]  = np.array([axpoly(time_hk),aypoly(time_hk),azpoly(time_hk)]).reshape(3,len(time_hk))
     jerktraj[1:,stepInd:stepInd+step] = np.array([jxpoly(time_hk),jypoly(time_hk),jzpoly(time_hk)]).reshape(3,len(time_hk))
+
     fulltraj[1:4,stepInd:stepInd+step]  = np.array([xpoly(time_hk),ypoly(time_hk),zpoly(time_hk)]).reshape(3,len(time_hk))
+
     fulltraj[4:7,stepInd:stepInd+step]  = np.array([vxpoly(time_hk),vypoly(time_hk),vzpoly(time_hk)]).reshape(3,len(time_hk))
+
     fulltraj[7:10,stepInd:stepInd+step] = np.array([axpoly(time_hk),aypoly(time_hk),azpoly(time_hk)]).reshape(3,len(time_hk))
     stepInd += step
 

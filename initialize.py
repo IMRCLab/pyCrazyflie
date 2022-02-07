@@ -2,7 +2,7 @@ import numpy as np
 from rowan import from_matrix, to_matrix 
 from utils import Rx, Ry, Rz
 
-dt = 0.002
+dt = 1e-3
 initPos = np.array([0,0,0.7])
 initR = np.eye(3)
 # initialize Rotation matrix about Roll-Pitch-Yaw

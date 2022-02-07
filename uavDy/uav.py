@@ -1,6 +1,6 @@
 import numpy as np
 from rowan.calculus import integrate as quat_integrate
-from rowan import from_matrix, to_matrix, to_euler
+from rowan import from_matrix, to_matrix, to_euler, from_euler
 from scipy import  integrate, linalg
 from utils import skew
 
@@ -13,7 +13,7 @@ class UavModel:
                0.718277 1.800197 29.261652)*10^-6 [kg.m^2]"""
 
         def __init__(self,dt ,state):
-            self.m      = 0.034  
+            self.m      = 0.028 
             self.I      = np.array([[16.571710, 0, 0],[0, 16.655602, 0],[0, 0, 29.261652]])* 1e-6 
             self.invI   = linalg.inv(self.I)
             self.d      = 4e-3
