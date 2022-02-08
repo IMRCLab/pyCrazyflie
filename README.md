@@ -22,7 +22,7 @@ make bindings_python
     ```python
     filename = "trajectoriescsv/inf.csv"
     ```
-* [ ] To run the simulator, open the terminal in `/pyCrazyflie` directory and type 
+* [ ] To run the simulator, open the terminal in `pyCrazyflie/` directory and type 
     ```bash
     python3 controller.py 
     ``` 
