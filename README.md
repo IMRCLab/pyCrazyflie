@@ -11,8 +11,11 @@ make bindings_python
 ## Simulation Structure
 * [ ] The `controller.py` is the main file of this repository. The dynamics of the UAV is encoded within `uavDy/uav.py`.
 * [ ] In order to execute a desired trajectory, add a `.csv` file in `trajectoriescsv/` folder in the following format:
-  * [ ] each row must contain: time, desired position, desired velocity, desired acceleration
-  * [ ] such that  desired position = [x, y, z], similarly for velocity and acceleration.
+  * [ ] each row must contain: time, desired position, desired velocity, desired acceleration. Such that, the desired position = [x, y, z], similarly for velocity and acceleration.
+    ``` 
+      *.csv file format
+        rows: time, xd, yd, zd, vxd, vyd, vzd, axd, ayd, azd
+    ```
 ### Main File: `controller.py`
 * [ ] First of all, make sure that the filename variable in the _main_ function is the same as the `trajectoriescsv/*.csv` needed to executed. e.g. 
 
