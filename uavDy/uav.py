@@ -9,7 +9,6 @@ def skew(w):
     w2 = w[1,0]
     w3 = w[2,0]
     return np.array([[0, -w3, w2],[w3, 0, -w1],[-w2, w1, 0]]).reshape((3,3))
-    s
 class UavModel:
         """initialize an instance of UAV object with the following physical parameters:
         m = 0.028 [kg]  -------------------------------------> Mass of the UAV
