@@ -1,12 +1,29 @@
 import numpy as np
-from utils import Rz, RotatedCylinder
-from rowan import from_matrix, to_matrix 
+import rowan as rn
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d 
 import matplotlib.animation as animation
 import uav
 
 
+def RotatedCylinder(center_x, center_y, radius, height_z, q):
+    R_i            = rn.to_matrix(q) 
+    z              = np.linspace(0, height_z, 50)
+    theta          = np.linspace(0, 2*np.pi, 50)
+    theta_grid, Zc = np.meshgrid(theta, z)
+    Xc = radius*np.cos(theta_grid) + center_x
+    Yc = radius*np.sin(theta_grid) + center_y
+    Xb = np.zeros_like(Xc)
+    Yb = np.zeros_like(Xc)
+    Zb = np.zeros_like(Xc)
+    for i in range(0,len(Xc.T)):
+        for j in range(0,len(Xc.T)):
+            rc = np.array([Xc[i,j],Yc[i,j],Zc[i,j]])
+            rb = R_i @ rc
+            Xb[i,j] = rb[0]
+            Yb[i,j] = rb[1]
+            Zb[i,j] = rb[2]   
+    return Xb, Yb, Zb
 
 class PlotandAnimate:
     def __init__(self, fig, ax, uavModel,full_state, reference_state): 
@@ -31,8 +48,10 @@ class PlotandAnimate:
         #Create the arms of the quadrotor in the body frame
         self.armb1  = np.array([[self.uavModel.d*10**(2)*np.cos(0)], [self.uavModel.d*10**(2)*np.sin(0)] ,[0]])
         self._armb1 = np.array([[-self.uavModel.d*10**(2)*np.cos(0)], [-self.uavModel.d*10**(2)*np.sin(0)] ,[0]])
-        self.armb2  = Rz(np.pi/2) @ (self.armb1.reshape(3,))
-        self._armb2 = Rz(np.pi/2) @ (self._armb1.reshape(3,))
+        q90z        = rn.from_euler(0, 0, np.radians(90),convention='xyz')
+        rot90z      = rn.to_matrix(q90z)
+        self.armb2  = rot90z @ (self.armb1.reshape(3,))
+        self._armb2 = rot90z @ (self._armb1.reshape(3,))
 
     def startAnimation(self,videoname,show,save,dt):
         self.ani = animation.FuncAnimation(self.fig, self.animate, frames=len(self.full_state), interval=dt*1000,blit=True)
@@ -57,7 +76,7 @@ class PlotandAnimate:
         wd = np.array([0,0,1])
         for i in range(0,len(x)):
             q = self.full_state[i,6:10]
-            R_i = to_matrix(q)
+            R_i = rn.to_matrix(q)
             u = R_i[:,0]
             v = R_i[:,1]
             w = R_i[:,2]
@@ -88,7 +107,7 @@ class PlotandAnimate:
         self.ax.set_zlabel('Z')
 
     def drawQuivers(self, x, y, z, q, xref, yref, zref):
-        R_i = to_matrix(q)
+        R_i = rn.to_matrix(q)
         u = R_i[:,0]
         v = R_i[:,1]
         w = R_i[:,2]
@@ -117,7 +136,7 @@ class PlotandAnimate:
         return xref, yref, zref
 
     def getArmpos(self, x, y, z, q):
-        R_i      = to_matrix(q)
+        R_i      = rn.to_matrix(q)
         position = np.array([x, y, z]) 
         armI1    = position + R_i @ (self.armb1.reshape(3,))
         _armI1   = position + R_i @ (self._armb1.reshape(3,))

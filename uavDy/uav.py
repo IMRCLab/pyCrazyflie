@@ -2,9 +2,14 @@ import numpy as np
 from rowan.calculus import integrate as quat_integrate
 from rowan import from_matrix, to_matrix, to_euler, from_euler
 from scipy import  integrate, linalg
-from utils import skew
 
-
+def skew(w):
+    w = w.reshape(3,1)
+    w1 = w[0,0]
+    w2 = w[1,0]
+    w3 = w[2,0]
+    return np.array([[0, -w3, w2],[w3, 0, -w1],[-w2, w1, 0]]).reshape((3,3))
+    s
 class UavModel:
         """initialize an instance of UAV object with the following physical parameters:
         m = 0.028 [kg]  -------------------------------------> Mass of the UAV
@@ -22,7 +27,7 @@ class UavModel:
             self.invAll = linalg.pinv(self.all)
             self.grav  = np.array([0,0,-self.m*9.81])
              ### State initialized with the Initial values ###
-             ### state = [x, y, z, xdot, ydot, zdot, q1, q2, q3, q4, wx, wy, wz]
+             ### state = [x, y, z, xdot, ydot, zdot, qw, qx, qy, qz, wx, wy, wz]
             self.state = state
             self.dt    = dt
            

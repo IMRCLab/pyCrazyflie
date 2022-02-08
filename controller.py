@@ -3,27 +3,24 @@ import sys
 import os
 path = os.path
 sys.path.append('uavDy/')
-sys.path.append('Utilities/')
-sys.path.append('simulator/')
-sys.path.append('genTrajectory/')
+sys.path.append('animation/')
 sys.path.append('trajectoriescsv/')
 sys.path.append('crazyflie-firmware/')
 
 import cffirmware
 import uav
 import numpy as np
-from initialize import dt, initState
-from rowan import to_euler, from_matrix, to_matrix , from_euler
+import rowan as rn
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d 
 import matplotlib.animation as animation
-from initialize import initState, dt
 from AnimateSingleUav import PlotandAnimate
 import time
 np.set_printoptions(linewidth=np.inf)
 np.set_printoptions(suppress=True)
 
 def initController():
+    """This function sets the initializes the controller"""
     cffirmware.controllerSJCInit()
     # Allocate output variable
     # For this example, only thrustSI, and torque members are relevant
@@ -36,6 +33,7 @@ def initController():
     return control, setpoint, sensors, state 
 
 def setTrajmode(setpoint):
+    """This function sets the trajectory modes of the controller"""
     setpoint.mode.x = cffirmware.modeAbs
     setpoint.mode.y = cffirmware.modeAbs
     setpoint.mode.z = cffirmware.modeAbs
@@ -45,7 +43,7 @@ def setTrajmode(setpoint):
     return setpoint
 
 def updateDesState(setpoint, fulltraj):
-    # fulltraj[3::] = 0
+    """This function updates the desired states"""
     setpoint.position.x = fulltraj[0]  # m
     setpoint.position.y = fulltraj[1]  # m
     setpoint.position.z = fulltraj[2]  # m
@@ -58,7 +56,8 @@ def updateDesState(setpoint, fulltraj):
     # setpoint.attitude.yaw = 0  # deg
     return setpoint
     
-def updateSensor(sensors,uavState):
+def updateSensor(sensors, uavState):
+    """This function updates the sensors signals"""
     sensors.gyro.x = np.degrees(uavState[10]) # deg/s
     sensors.gyro.y = np.degrees(uavState[11]) # deg/s
     sensors.gyro.z = np.degrees(uavState[12]) # deg/s
@@ -66,6 +65,7 @@ def updateSensor(sensors,uavState):
 
 
 def updateState(state, uavState):
+    """This function passes the current states to the controller"""
     state.position.x = uavState[0]   # m
     state.position.y = uavState[1]    # m
     state.position.z = uavState[2]    # m
@@ -73,23 +73,44 @@ def updateState(state, uavState):
     state.velocity.y = uavState[4]    # m/s
     state.velocity.z = uavState[5]    # m/s
     q_curr = np.array(uavState[6:10]).reshape((4,))
-    rpy_state  = to_euler(q_curr,convention='xyz')
+    rpy_state  = rn.to_euler(q_curr,convention='xyz')
     state.attitude.roll  = np.degrees(rpy_state[0])
     state.attitude.pitch = np.degrees(-rpy_state[1])
     state.attitude.yaw   = np.degrees(rpy_state[2])
+    state.attitudeQuaternion.w = q_curr[0]
+    state.attitudeQuaternion.x = q_curr[1]
+    state.attitudeQuaternion.y = q_curr[2]
+    state.attitudeQuaternion.z = q_curr[3]
     fullState = np.array([state.position.x,state.position.y,state.position.z, 
                           state.velocity.x,state.velocity.y, state.velocity.z, 
                           q_curr[0],q_curr[1],q_curr[2],q_curr[3], 0,0,0]).reshape((13,))
     return state,fullState
 
-def stateUavStateError(state, uavState):    
-    state_ = np.array([state.position.x, state.position.y, state.position.z, state.attitude.roll, state.attitude.pitch, state.attitude.yaw])
-    q_curr = np.array(uavState[6:10]).reshape((4,))
-    rpy_state  = to_euler(q_curr,convention='xyz')
-    uavState_ = np.array([uavState[0], uavState[1], uavState[2],rpy_state[0], rpy_state[1], rpy_state[2]])
-    return state_ - uavState_
-
-
+def initializeState():
+    """This function sets the initial states of the UAV
+        dt: time step
+        initPose: initial position [x,y,z]
+        initq: initial rotations represented in quaternions 
+        initLinVel: [xdot, ydot, zdot] initial linear velocities
+        initAngVel: [wx, wy, wz] initial angular velocities"""
+    dt = 1e-3
+    x, y, z = 0, 0, 0.7
+    initPos = np.array([x, y, z])
+    # initialize Rotation matrix about Roll-Pitch-Yaw
+    roll, pitch, yaw  = np.radians(0), np.radians(0), np.radians(0) 
+    initq = rn.from_euler(roll, pitch, yaw)
+    #Initialize Twist
+    vx, vy, vz = 0, 0, 0
+    initLinVel = np.array([vx,vy,vz])
+    wx, wy, wz = 0, 0, 0
+    initAngVel = np.array([vx,vy,vz])
+    ### State = [x, y, z, xdot, ydot, zdot, qw, qx, qy, qz, wx, wy, wz] ###
+    initState = np.zeros((13,))
+    initState[0:3]  = initPos  # position: x,y,z
+    initState[3:6]  = initLinVel  # linear velocity: xdot, ydot, zdot
+    initState[6:10] = initq# quaternions: [qw, qx, qy, qz]
+    initState[10::] = initAngVel # angular velocity: wx, wy, wz
+    return dt, initState
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##        
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##
 def main():
@@ -97,9 +118,10 @@ def main():
     # dt: time interval
     # initState: initial state
     # set it as 1 tick: i.e: 1 ms
+    dt, initState = initializeState()
     uav1 = uav.UavModel(dt, initState)
     # Upload the traj in csv file format
-    # rows: time, xdes, ydes, zdes
+    # rows: time, xdes, ydes, zdes, vxdes, vydes, vzdes, axdes, aydes, azdes
     filename = "trajectoriescsv/inf.csv"
     timeStamped_traj = np.genfromtxt(filename, delimiter=',')
     # final time of traj in ms
@@ -144,7 +166,7 @@ def main():
 
     animateAndSave = True
     if animateAndSave:
-        videoname  = 'infinty8_newmass.mp4' 
+        videoname  = 'infinitytraj.gif' 
         dt_sampled = dt * sample
         show       = False
         save       = True
