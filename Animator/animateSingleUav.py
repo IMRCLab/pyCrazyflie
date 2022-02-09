@@ -3,7 +3,77 @@ import rowan as rn
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d 
 import matplotlib.animation as animation
+from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.gridspec import SubplotSpec
 from uavDy import uav
+
+def create_subtitle(fig: plt.Figure, grid: SubplotSpec, title: str):
+    row = fig.add_subplot(grid)
+    row.set_title('\n\n\n'+title, fontweight='medium',fontsize='small')
+    row.set_frame_on(False)
+    row.axis('off')
+
+def outputPlots(ref_state, full_state, showPlot, tf_sim, pdfName):
+    print('Plotting...')
+    plt.rcParams['axes.grid'] = True
+    
+    fig1, ax1 = plt.subplots(2, 3, sharex=True ,sharey=True, squeeze=True)
+    # fig1.set_size_inches(18, 4)
+    fig1.tight_layout()
+    
+    fig2, ax2 = plt.subplots(2, 3, sharex=True, sharey=True, squeeze=True)
+    # fig2.set_size_inches(18, 4)
+    fig2.tight_layout()
+
+    fig3, ax3 = plt.subplots(3, 1, sharex=True ,sharey=True, squeeze=True)
+    # fig3.set_size_inches(18, 4)
+    fig3.tight_layout()
+
+    time   = np.linspace(0, tf_sim*1e-3, num=len(full_state)) 
+    pos    = full_state[:,0:3]
+    linVel = full_state[:,3:6]
+    angVel = full_state[:,10::]
+  
+    posdes    = ref_state[:,0:3]
+    linVeldes = ref_state[:,3::]
+    ts = 'time [s]'
+    
+    ax1[0,0].plot(time, pos[:,0]), ax1[0,1].plot(time, pos[:,1]), ax1[0,2].plot(time, pos[:,2])
+    ax1[0,0].set_ylabel('x [m]',), ax1[0,1].set_ylabel('y [m]'), ax1[0,2].set_ylabel('z [m]')
+    ax1[1,0].plot(time, posdes[:,0]), ax1[1,1].plot(time, posdes[:,1]), ax1[1,2].plot(time, posdes[:,2])
+    ax1[1,0].set_ylabel('x des [m]'), ax1[1,1].set_ylabel('y des [m]'), ax1[1,2].set_ylabel('z des [m]')
+    fig1.supxlabel(ts,fontsize='small')
+
+    grid = plt.GridSpec(2,3)
+    create_subtitle(fig1, grid[0, ::], 'Actual Positions')
+    create_subtitle(fig1, grid[1, ::], 'Reference Positions')
+      
+    ax2[0,0].plot(time, linVel[:,0]), ax2[0,1].plot(time, linVel[:,1]), ax2[0,2].plot(time, linVel[:,2])
+    ax2[0,0].set_ylabel('vx [m/s]'), ax2[0,1].set_ylabel('vy [m/s]'), ax2[0,2].set_ylabel('vz [m/s]')
+    
+    ax2[1,0].plot(time, linVeldes[:,0]), ax2[1,1].plot(time, linVeldes[:,1]), ax2[1,2].plot(time, linVeldes[:,2])
+    ax2[1,0].set_ylabel('vx des [m/s]'), ax2[1,1].set_ylabel('vy des [m/s]'), ax2[1,2].set_ylabel('vz des [m/s]')
+    fig2.supxlabel(ts,fontsize='small')
+
+    grid = plt.GridSpec(2,3)
+    create_subtitle(fig2, grid[0, ::], 'Actual Linear Velocities')
+    create_subtitle(fig2, grid[1, ::], 'Reference Linear Velocities')
+    
+    ax3[0].plot(time, angVel[:,0])
+    ax3[1].plot(time, angVel[:,1])
+    ax3[2].plot(time, angVel[:,2])
+    ax3[0].set_ylabel('wx [deg/s]',labelpad=-5), ax3[1].set_ylabel('wy [deg/s]',labelpad=-5), ax3[2].set_ylabel('wz [deg/s]',labelpad=-5)
+    fig3.supxlabel(ts,fontsize='small')
+
+    grid = plt.GridSpec(3,1)
+    create_subtitle(fig3, grid[0, ::], 'Actual Angular Velocities')
+    
+    with PdfPages(pdfName) as pdf:
+      fig1.savefig(pdf, format='pdf', bbox_inches='tight')
+      fig2.savefig(pdf, format='pdf', bbox_inches='tight')
+      fig3.savefig(pdf, format='pdf', bbox_inches='tight')
+    if showPlot:
+        plt.show()
 
 
 def RotatedCylinder(center_x, center_y, radius, height_z, q):
@@ -53,45 +123,9 @@ class PlotandAnimate:
         self.armb2  = rot90z @ (self.armb1.reshape(3,))
         self._armb2 = rot90z @ (self._armb1.reshape(3,))
 
-    def startAnimation(self,videoname,show,save,dt):
+    def startAnimation(self,videoname,dt):
         self.ani = animation.FuncAnimation(self.fig, self.animate, frames=len(self.full_state), interval=dt*1000,blit=True)
-        if show:   
-            plt.show()
-        if save:
-            self.ani.save('Videos/'+videoname)
-
-
-    def plotFulltraj(self):
-        self.setlimits()
-        x = self.full_state[:,0]
-        y = self.full_state[:,1]
-        z = self.full_state[:,2]
-        xref = self.reference_state[:,0]
-        yref = self.reference_state[:,1]
-        zref = self.reference_state[:,2]
-        self.ax.plot3D(x, y, z, 'k--',lw=1.5)
-        self.ax.plot3D(xref, yref ,zref,'g--',lw=1.5)
-        ud = np.array([1,0,0])
-        vd = np.array([0,1,0])  
-        wd = np.array([0,0,1])
-        for i in range(0,len(x)):
-            q = self.full_state[i,6:10]
-            R_i = rn.to_matrix(q)
-            u = R_i[:,0]
-            v = R_i[:,1]
-            w = R_i[:,2]
-            self.vec1  = self.ax.quiver(x[i],y[i],z[i], u[0], u[1] ,u[2],color = 'r', length = 0.2)
-            self.vec2  = self.ax.quiver(x[i],y[i],z[i], v[0], v[1] ,v[2],color = 'g', length = 0.2)  
-            self.vec3  = self.ax.quiver(x[i],y[i],z[i], w[0], w[1] ,w[2],color = 'b', length = 0.2)
-           
-            self.vec1  = self.ax.quiver(x,y,z, u[0], u[1] ,u[2],color = 'r', length = 0.2)
-            self.vec2  = self.ax.quiver(x,y,z, v[0], v[1] ,v[2],color = 'g', length = 0.2)
-            self.vec3  = self.ax.quiver(x,y,z, w[0], w[1] ,w[2],color = 'b', length = 0.2)
-            self.vec1r = self.ax.quiver(xref,yref,zref, ud[0], ud[1] ,ud[2],color = 'r', length = 0.3)
-            self.vec2r = self.ax.quiver(xref,yref,zref, vd[0], vd[1] ,vd[2],color = 'g', length = 0.3)
-            self.vec3r = self.ax.quiver(xref,yref,zref, wd[0], wd[1] ,wd[2],color = 'b', length = 0.3)
-        self.ax.plot3D(x, y, z, 'k--',lw=1.5)    
-        plt.show()
+        self.ani.save('Videos/'+videoname)
 
     def setlimits(self):
         edge  = 0.9

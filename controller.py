@@ -12,7 +12,7 @@ np.set_printoptions(linewidth=np.inf)
 np.set_printoptions(suppress=True)
 
 def initController():
-    """This function sets the initializes the controller"""
+    """This function initializes the controller"""
     cffirmware.controllerSJCInit()
     # Allocate output variable
     # For this example, only thrustSI, and torque members are relevant
@@ -75,7 +75,7 @@ def updateState(state, uavState):
     state.attitudeQuaternion.z = q_curr[3]
     fullState = np.array([state.position.x,state.position.y,state.position.z, 
                           state.velocity.x,state.velocity.y, state.velocity.z, 
-                          q_curr[0],q_curr[1],q_curr[2],q_curr[3], 0,0,0]).reshape((13,))
+                          q_curr[0],q_curr[1],q_curr[2],q_curr[3], uavState[10],uavState[11],uavState[12]]).reshape((13,))
     return state,fullState
 
 def initializeState():
@@ -103,6 +103,32 @@ def initializeState():
     initState[6:10] = initq# quaternions: [qw, qx, qy, qz]
     initState[10::] = initAngVel # angular velocity: wx, wy, wz
     return dt, initState
+
+def animateTrajectory(uavModel, full_state, ref_state, videoname):
+    # Animation    
+    fig     = plt.figure(figsize=(10,10))
+    ax      = fig.add_subplot(autoscale_on=True,projection="3d")
+    sample  = 100
+    animate = animateSingleUav.PlotandAnimate(fig, ax, uavModel, full_state[::sample,:],ref_state[::sample,:]) 
+    dt_sampled = uavModel.dt * sample
+    print("Converting Animation to Video. \nPlease wait...")
+    now = time.time()
+    startanimation = animate.startAnimation(videoname,dt_sampled)
+    end = time.time()
+    plt.close(fig)
+    print("Run time:  {:.3f}s".format((end - now)))
+
+def animateOrPlot(uavModel, full_state, ref_state, animateOrPlotdict, videoname, pdfName, tf_sim): 
+    if animateOrPlotdict['animte'] and animateOrPlotdict['savePlot']:
+        animateTrajectory(uavModel , full_state, ref_state, videoname) 
+        animateSingleUav.outputPlots(ref_state, full_state, animateOrPlotdict['savePlot'], tf_sim, pdfName)       
+    elif animateOrPlotdict['animte']:
+        animateTrajectory(uavModel , full_state, ref_state, videoname)
+    else:
+        # The plot will be saved as a pdf eitherways
+        # showPlot: plt.show(), just to show the plot after running
+        animateSingleUav.outputPlots(ref_state, full_state, animateOrPlotdict['savePlot'], tf_sim, pdfName)
+   
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##        
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##
 def main():
@@ -114,12 +140,13 @@ def main():
     uav1 = uav.UavModel(dt, initState)
     # Upload the traj in csv file format
     # rows: time, xdes, ydes, zdes, vxdes, vydes, vzdes, axdes, aydes, azdes
-    filename = "trajectoriescsv/inf.csv"
-    timeStamped_traj = np.genfromtxt(filename, delimiter=',')
+    filename = "infinity8"
+    # timeStamped_traj = np.genfromtxt(filename+'.csv', delimiter=',')
+    timeStamped_traj = np.loadtxt('trajectoriescsv/'+filename +'.csv', delimiter=',')   
     # final time of traj in ms
     tf_ms = timeStamped_traj[0,-1]*1e3
     # Simulation time
-    tf_sim = tf_ms + 5e3
+    tf_sim = tf_ms + 3e3
     #initialize the controller and allocate current state (both sensor and state are the state)
     # This is kind of odd and should be part of state
     control, setpoint, sensors, state = initController()
@@ -128,15 +155,16 @@ def main():
     # and the position controller only at 100 Hz
     # If you want an output always, simply select tick==0
     full_state = np.zeros((1,13))
-    ref_state = np.zeros((1 ,3))
+    ref_state  = np.zeros((1 ,6))
+    
     for tick in range(0, int(tf_sim)+1):
         # update desired state
         if tick <= int(tf_ms):
             setpoint  = updateDesState(setpoint, timeStamped_traj[1::,tick])
-            ref_state  = np.concatenate((ref_state, timeStamped_traj[1:4,tick].reshape((1,3))))
+            ref_state  = np.concatenate((ref_state, timeStamped_traj[1:7,tick].reshape((1,6))))
         else:
             setpoint = updateDesState(setpoint, timeStamped_traj[1::,-1])
-            ref_state  = np.concatenate((ref_state, timeStamped_traj[1:4,-1].reshape((1,3))))
+            ref_state  = np.concatenate((ref_state, timeStamped_traj[1:7,-1].reshape((1,6))))
         # update current state
         state,fullState = updateState(state, uav1.state)
         sensors         = updateSensor(sensors, uav1.state)
@@ -146,34 +174,16 @@ def main():
         control_inp =  np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
         uav1.states_evolution(control_inp)
         print(control_inp)
-        full_state = np.concatenate((full_state, uav1.state.reshape(1,13)))
-
-    # Animation    
+        full_state = np.concatenate((full_state, fullState.reshape(1,13)))
     full_state = np.delete(full_state, 0, 0)
     ref_state  = np.delete(ref_state, 0, 0)
-    fig     = plt.figure(figsize=(10,10))
-    ax      = fig.add_subplot(autoscale_on=True,projection="3d")
-    sample  = 100
-    animate = animateSingleUav.PlotandAnimate(fig, ax, uav1, full_state[::sample,:],ref_state[::sample,:])
 
-    animateAndSave = True
-    if animateAndSave:
-        videoname  = 'infinitytraj.gif' 
-        dt_sampled = dt * sample
-        show       = False
-        save       = True
-        if show:
-            print("Showing animation.")
-        if save:
-            print("Converting Animation to Video. \nPlease wait...")
-        now = time.time()
-        startanimation = animate.startAnimation(videoname,show,save,dt_sampled)
-        # plotfulltraj = animate.plotFulltraj();
-        end = time.time()
-        print("Run time:  {:.3f}s".format((end - now)))
-    else:
-        print("plotting full trajectory")
-        plotfulltraj = animate.plotFulltraj();  
+    # Animation    
+    animateOrPlotdict = {'animte':True, 'savePlot':True}
+    videoname = filename +'.gif'
+    pdfName = filename +'.pdf'
+    animateOrPlot(uav1, full_state, ref_state, animateOrPlotdict, videoname, pdfName, tf_sim)    
+       
 
 if __name__ == '__main__':
     try: 

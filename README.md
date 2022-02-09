@@ -41,4 +41,4 @@ Add _cffirmware-firmware/_ to your `PYTHONPATH`. Open a terminal in the `pyCrazy
 ```
 ___
 ## Expected Output in Vidoes/ Directory
-![Markdown Logo](Videos/infinitytraj.gif)
+![Markdown Logo](Videos/infinity8.gif)
