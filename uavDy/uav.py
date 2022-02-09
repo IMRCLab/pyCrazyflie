@@ -55,7 +55,7 @@ class UavModel:
 
             curr_pos  = self.state[0:3]  # position: x,y,z
             curr_vel  = self.state[3:6]  # linear velocity: xdot, ydot, zdot
-            curr_q    = self.state[6:10] # quaternions: [q1, q2, q3, q4]
+            curr_q    = self.state[6:10] # quaternions: [qw, qx, qy, qz]
             curr_w    = self.state[10::]  # angular velocity: wx, wy, wz
             
             posNext, velNext = self.getNextLinearState(curr_vel, curr_pos, curr_q, fz)
@@ -63,7 +63,7 @@ class UavModel:
             
             self.state[0:3]  = posNext  # position: x,y,z
             self.state[3:6]  = velNext  # linear velocity: xdot, ydot, zdot
-            self.state[6:10] = qNext# quaternions: [q1, q2, q3, q4]
+            self.state[6:10] = qNext# quaternions: [qw, qx, qy, qz]
             self.state[10::] = wNext # angular velocity: wx, wy, wz
             return self.state
            

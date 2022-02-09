@@ -5,9 +5,10 @@ git clone --recursive git@github.com:IMRCLab/pyCrazyflie.git
 cd crazyflie-firmware
 make bindings_python
 ```
----
----
-
+Add _cffirmware-firmware/_ to your `PYTHONPATH`. Open a terminal in the `pyCrazyflie/` directory and type
+``` bash
+ export PYTHONPATH=crazyflie-firmware/
+```
 ## Simulation Structure
 * [ ] The `controller.py` is the main file of this repository. The dynamics of the UAV is encoded within `uavDy/uav.py`.
 * [ ] In order to execute a desired trajectory, add a `.csv` file in `trajectoriescsv/` folder in the following format:

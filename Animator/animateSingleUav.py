@@ -3,7 +3,7 @@ import rowan as rn
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d 
 import matplotlib.animation as animation
-import uav
+from uavDy import uav
 
 
 def RotatedCylinder(center_x, center_y, radius, height_z, q):

@@ -1,21 +1,13 @@
-#!/usr/bin/env python
-import sys
-import os
-path = os.path
-sys.path.append('uavDy/')
-sys.path.append('animation/')
-sys.path.append('trajectoriescsv/')
-sys.path.append('crazyflie-firmware/')
-
-import cffirmware
-import uav
 import numpy as np
 import rowan as rn
 import matplotlib.pyplot as plt
-from mpl_toolkits import mplot3d 
-import matplotlib.animation as animation
-from AnimateSingleUav import PlotandAnimate
+from uavDy import uav
+from Animator import animateSingleUav 
+from trajectoriescsv import *
 import time
+# import sys
+# sys.path.append('crazyflie-firmware/')
+# import cffirmware
 np.set_printoptions(linewidth=np.inf)
 np.set_printoptions(suppress=True)
 
@@ -162,7 +154,7 @@ def main():
     fig     = plt.figure(figsize=(10,10))
     ax      = fig.add_subplot(autoscale_on=True,projection="3d")
     sample  = 100
-    animate = PlotandAnimate(fig, ax, uav1, full_state[::sample,:],ref_state[::sample,:])
+    animate = animateSingleUav.PlotandAnimate(fig, ax, uav1, full_state[::sample,:],ref_state[::sample,:])
 
     animateAndSave = True
     if animateAndSave:
@@ -181,7 +173,14 @@ def main():
         print("Run time:  {:.3f}s".format((end - now)))
     else:
         print("plotting full trajectory")
-        plotfulltraj = animate.plotFulltraj();    
+        plotfulltraj = animate.plotFulltraj();  
+
 if __name__ == '__main__':
-	main()
+    try: 
+      import cffirmware
+      main()
+    except ImportError as imp:
+        print(imp)
+        print('Please export crazyflie-firmware/ to your PYTHONPATH')
+
 
