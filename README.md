@@ -18,17 +18,16 @@ Add _cffirmware-firmware/_ to your `PYTHONPATH`. Open a terminal in the `pyCrazy
         rows: time, xd, yd, zd, vxd, vyd, vzd, axd, ayd, azd
     ```
 ### Main File: `controller.py`
-* [ ] First of all, make sure that the filename variable in the _main_ function is the same as the `trajectoriescsv/*.csv` needed to executed. e.g. 
-
-    ```python
-    filename = "trajectoriescsv/inf.csv"
-    ```
 * [ ] To run the simulator, open the terminal in `pyCrazyflie/` directory and type 
+  ```bash
+    python3 controller.py trajectorycsv/infinity8.csv 
+    ```    
+* [ ] In order to animate the simulation in a *.gif* format or save the generated plots in a pdf type this command
     ```bash
-    python3 controller.py 
+    python3 controller.py trajectorycsv/infinity8.csv --animate --plotSave
     ``` 
-* [ ] In order to choose whether to generate a video *.mp4* generated in the main directory, or show just a plot of the body frame, you will find a boolean *animateAndSave*. If true, the video will be generated otherwise a plot will be shown.
-* [ ] For the frequency of the frames to be shown in the plotting (and similar for the video), change the *sample* variable. 
+* [ ] `--animate` and `--savePlot` are flags. Their defaults are both False. 
+* [ ] For the frequency of the frames to be shown in the plotting (and similar for the video), change the *sample* variable inside `controller.py` main function. 
 * [ ] Finally, the initial state of the UAV  and the time step _dt_ are intialized in the following function
 ```python
   def initializeState():
