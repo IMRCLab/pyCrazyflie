@@ -2,3 +2,8 @@ __pycache__
 .vscode
 *.mp4
 *.pdf
+*.gif
+*.csv
+
+!Videos/infinity8.gif
+!trajectoriescsv/infinity8.csv

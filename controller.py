@@ -5,9 +5,8 @@ from uavDy import uav
 from Animator import animateSingleUav 
 from trajectoriescsv import *
 import time
-# import sys
-# sys.path.append('crazyflie-firmware/')
-# import cffirmware
+import argparse
+
 np.set_printoptions(linewidth=np.inf)
 np.set_printoptions(suppress=True)
 
@@ -119,19 +118,20 @@ def animateTrajectory(uavModel, full_state, ref_state, videoname):
     print("Run time:  {:.3f}s".format((end - now)))
 
 def animateOrPlot(uavModel, full_state, ref_state, animateOrPlotdict, videoname, pdfName, tf_sim): 
-    if animateOrPlotdict['animte'] and animateOrPlotdict['savePlot']:
+    if animateOrPlotdict['animate'] and animateOrPlotdict['savePlot']:
+        animateSingleUav.outputPlots(ref_state, full_state, animateOrPlotdict['savePlot'], tf_sim, pdfName)    
         animateTrajectory(uavModel , full_state, ref_state, videoname) 
-        animateSingleUav.outputPlots(ref_state, full_state, animateOrPlotdict['savePlot'], tf_sim, pdfName)       
-    elif animateOrPlotdict['animte']:
+    elif animateOrPlotdict['animate']:
         animateTrajectory(uavModel , full_state, ref_state, videoname)
+        print('Animation')
     else:
-        # The plot will be saved as a pdf eitherways
-        # showPlot: plt.show(), just to show the plot after running
+        # The plot will be shown eitherways
+        # savePlot: saves plot in pdf format
         animateSingleUav.outputPlots(ref_state, full_state, animateOrPlotdict['savePlot'], tf_sim, pdfName)
    
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##        
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##
-def main():
+def main(filename, animateOrPlotdict):
     # Initialize an instance of a uav dynamic model with:
     # dt: time interval
     # initState: initial state
@@ -140,11 +140,11 @@ def main():
     uav1 = uav.UavModel(dt, initState)
     # Upload the traj in csv file format
     # rows: time, xdes, ydes, zdes, vxdes, vydes, vzdes, axdes, aydes, azdes
-    filename = "infinity8"
-    # timeStamped_traj = np.genfromtxt(filename+'.csv', delimiter=',')
-    timeStamped_traj = np.loadtxt('trajectoriescsv/'+filename +'.csv', delimiter=',')   
+    # timeStamped_traj = np.genfromtxt(filename, delimiter=',')
+    timeStamped_traj = np.loadtxt(filename, delimiter=',')   
     # final time of traj in ms
     tf_ms = timeStamped_traj[0,-1]*1e3
+    print('total time: '+str(tf_ms*1e-3))
     # Simulation time
     tf_sim = tf_ms + 3e3
     #initialize the controller and allocate current state (both sensor and state are the state)
@@ -173,22 +173,29 @@ def main():
         # states evolution
         control_inp =  np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
         uav1.states_evolution(control_inp)
-        print(control_inp)
+        # print(control_inp)
         full_state = np.concatenate((full_state, fullState.reshape(1,13)))
     full_state = np.delete(full_state, 0, 0)
     ref_state  = np.delete(ref_state, 0, 0)
 
     # Animation    
-    animateOrPlotdict = {'animte':True, 'savePlot':True}
-    videoname = filename +'.gif'
-    pdfName = filename +'.pdf'
+    filename  = filename.replace('trajectoriescsv/', '')
+    filename  = filename.replace('.csv', '')
+    videoname = filename   +'.gif'
+    pdfName   = filename   +'.pdf'
     animateOrPlot(uav1, full_state, ref_state, animateOrPlotdict, videoname, pdfName, tf_sim)    
        
 
 if __name__ == '__main__':
     try: 
       import cffirmware
-      main()
+      parser = argparse.ArgumentParser()
+      parser.add_argument('filename', type=str, help="Name of the CSV file in trajectoriescsv directory")
+      parser.add_argument('--animate', default=False, action='store_true', help='Set true to save a gif in Videos directory')
+      parser.add_argument('--savePlot', default=False, action='store_true', help='Set true to save plots in a pdf  format')
+      args   = parser.parse_args()   
+      animateOrPlotdict = {'animate':args.animate, 'savePlot':args.savePlot}
+      main(args.filename, animateOrPlotdict)
     except ImportError as imp:
         print(imp)
         print('Please export crazyflie-firmware/ to your PYTHONPATH')

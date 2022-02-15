@@ -13,7 +13,7 @@ def create_subtitle(fig: plt.Figure, grid: SubplotSpec, title: str):
     row.set_frame_on(False)
     row.axis('off')
 
-def outputPlots(ref_state, full_state, showPlot, tf_sim, pdfName):
+def outputPlots(ref_state, full_state, savePlot, tf_sim, pdfName):
     print('Plotting...')
     plt.rcParams['axes.grid'] = True
     
@@ -67,13 +67,12 @@ def outputPlots(ref_state, full_state, showPlot, tf_sim, pdfName):
 
     grid = plt.GridSpec(3,1)
     create_subtitle(fig3, grid[0, ::], 'Actual Angular Velocities')
-    
-    with PdfPages(pdfName) as pdf:
-      fig1.savefig(pdf, format='pdf', bbox_inches='tight')
-      fig2.savefig(pdf, format='pdf', bbox_inches='tight')
-      fig3.savefig(pdf, format='pdf', bbox_inches='tight')
-    if showPlot:
-        plt.show()
+    if savePlot:
+        with PdfPages(pdfName) as pdf:
+            fig1.savefig(pdf, format='pdf', bbox_inches='tight')
+            fig2.savefig(pdf, format='pdf', bbox_inches='tight')
+            fig3.savefig(pdf, format='pdf', bbox_inches='tight')    
+    plt.show()
 
 
 def RotatedCylinder(center_x, center_y, radius, height_z, q):
