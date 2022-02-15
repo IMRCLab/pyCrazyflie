@@ -119,8 +119,8 @@ def animateTrajectory(uavModel, full_state, ref_state, videoname):
 
 def animateOrPlot(uavModel, full_state, ref_state, animateOrPlotdict, videoname, pdfName, tf_sim): 
     if animateOrPlotdict['animate'] and animateOrPlotdict['savePlot']:
-        animateSingleUav.outputPlots(ref_state, full_state, animateOrPlotdict['savePlot'], tf_sim, pdfName)    
-        animateTrajectory(uavModel , full_state, ref_state, videoname) 
+        animateTrajectory(uavModel , full_state, ref_state, videoname)
+        animateSingleUav.outputPlots(ref_state, full_state, animateOrPlotdict['savePlot'], tf_sim, pdfName)     
     elif animateOrPlotdict['animate']:
         animateTrajectory(uavModel , full_state, ref_state, videoname)
         print('Animation')
