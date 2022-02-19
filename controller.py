@@ -131,20 +131,22 @@ def animateOrPlot(uavModel, full_state, ref_state, cont_stack, animateOrPlotdict
    
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##        
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##
-def main(filename, animateOrPlotdict):
+def main(filename, animateOrPlotdict, uav_dy):
     # Initialize an instance of a uav dynamic model with:
     # dt: time interval
     # initState: initial state
     # set it as 1 tick: i.e: 1 ms
     dt, initState = initializeState()
-    uav1 = uav.UavModel(dt, initState)
+    I = np.array([[float(uav_dy['Ixx']),0,0],[0,float(uav_dy['Iyy']),0],[0,0,float(uav_dy['Izz'])]])
+    uav1 = uav.UavModel(dt, initState, m=float(uav_dy['m']) ,I=I, d=float(uav_dy['d']), cft=float(uav_dy['cft']))
+    print(uav1)
     # Upload the traj in csv file format
     # rows: time, xdes, ydes, zdes, vxdes, vydes, vzdes, axdes, aydes, azdes
     # timeStamped_traj = np.genfromtxt(filename, delimiter=',')
     timeStamped_traj = np.loadtxt(filename, delimiter=',')   
     # final time of traj in ms
     tf_ms = timeStamped_traj[0,-1]*1e3
-    print('total trajectory time: '+str(tf_ms*1e-3))
+    print('\n Total trajectory time: '+str(tf_ms*1e-3)+ 's')
     # Simulation time
     tf_sim = tf_ms + 3e3
     #initialize the controller and allocate current state (both sensor and state are the state)
@@ -189,14 +191,18 @@ def main(filename, animateOrPlotdict):
 
 if __name__ == '__main__':
     try: 
-      import cffirmware
-      parser = argparse.ArgumentParser()
-      parser.add_argument('filename', type=str, help="Name of the CSV file in trajectoriescsv directory")
-      parser.add_argument('--animate', default=False, action='store_true', help='Set true to save a gif in Videos directory')
-      parser.add_argument('--savePlot', default=False, action='store_true', help='Set true to save plots in a pdf  format')
-      args   = parser.parse_args()   
-      animateOrPlotdict = {'animate':args.animate, 'savePlot':args.savePlot}
-      main(args.filename, animateOrPlotdict)
+        import cffirmware
+        parser = argparse.ArgumentParser()
+        parser.add_argument('filename', type=str, help="Name of the CSV file in trajectoriescsv directory")
+        parser.add_argument('--animate', default=False, action='store_true', help='Set true to save a gif in Videos directory')
+        parser.add_argument('--savePlot', default=False, action='store_true', help='Set true to save plots in a pdf  format')
+        args   = parser.parse_args()   
+        animateOrPlotdict = {'animate':args.animate, 'savePlot':args.savePlot}
+    
+        import yaml
+        with open('config/initialize.yaml') as f:
+            uav_dy = yaml.load(f, Loader=yaml.FullLoader)
+        main(args.filename, animateOrPlotdict, uav_dy)
     except ImportError as imp:
         print(imp)
         print('Please export crazyflie-firmware/ to your PYTHONPATH')

@@ -16,12 +16,12 @@ class UavModel:
                0.830806 16.655602 1.800197    -----------------> Moment of Inertia 
                0.718277 1.800197 29.261652)*10^-6 [kg.m^2]"""
 
-        def __init__(self,dt ,state):
-            self.m      = 0.034
-            self.I      = np.array([[16.571710, 0, 0],[0, 16.655602, 0],[0, 0, 29.261652]])* 1e-6 
+        def __init__(self,dt ,state, m, I, d, cft):
+            self.m      = m
+            self.I      = I
             self.invI   = linalg.inv(self.I)
-            self.d      = 4e-3
-            self.cft    = 0.005964552 
+            self.d      = d 
+            self.cft    = cft
             self.all    = np.array([[1, 1, 1, 1],[0, -self.d, 0 , self.d],[self.d, 0 , -self.d, 0],[-self.cft, self.cft, -self.cft, self.cft]])
             self.invAll = linalg.pinv(self.all)
             self.grav  = np.array([0,0,-self.m*9.81])
