@@ -117,17 +117,17 @@ def animateTrajectory(uavModel, full_state, ref_state, videoname):
     plt.close(fig)
     print("Run time:  {:.3f}s".format((end - now)))
 
-def animateOrPlot(uavModel, full_state, ref_state, animateOrPlotdict, videoname, pdfName, tf_sim): 
+def animateOrPlot(uavModel, full_state, ref_state, cont_stack, animateOrPlotdict, videoname, pdfName, tf_sim): 
     if animateOrPlotdict['animate'] and animateOrPlotdict['savePlot']:
         animateTrajectory(uavModel , full_state, ref_state, videoname)
-        animateSingleUav.outputPlots(ref_state, full_state, animateOrPlotdict['savePlot'], tf_sim, pdfName)     
+        animateSingleUav.outputPlots(ref_state, full_state, cont_stack, animateOrPlotdict['savePlot'], tf_sim, pdfName)     
     elif animateOrPlotdict['animate']:
         animateTrajectory(uavModel , full_state, ref_state, videoname)
         print('Animation')
     else:
         # The plot will be shown eitherways
         # savePlot: saves plot in pdf format
-        animateSingleUav.outputPlots(ref_state, full_state, animateOrPlotdict['savePlot'], tf_sim, pdfName)
+        animateSingleUav.outputPlots(ref_state, full_state, cont_stack, animateOrPlotdict['savePlot'], tf_sim, pdfName)
    
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##        
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##
@@ -144,7 +144,7 @@ def main(filename, animateOrPlotdict):
     timeStamped_traj = np.loadtxt(filename, delimiter=',')   
     # final time of traj in ms
     tf_ms = timeStamped_traj[0,-1]*1e3
-    print('total time: '+str(tf_ms*1e-3))
+    print('total trajectory time: '+str(tf_ms*1e-3))
     # Simulation time
     tf_sim = tf_ms + 3e3
     #initialize the controller and allocate current state (both sensor and state are the state)
@@ -154,9 +154,9 @@ def main(filename, animateOrPlotdict):
     # note that the attitude controller will only compute a new output at 500 Hz
     # and the position controller only at 100 Hz
     # If you want an output always, simply select tick==0
-    full_state = np.zeros((1,13))
-    ref_state  = np.zeros((1 ,6))
-    
+    full_state = np.zeros((1, 13))
+    ref_state  = np.zeros((1, 6))
+    cont_stack = np.zeros((1, 4))
     for tick in range(0, int(tf_sim)+1):
         # update desired state
         if tick <= int(tf_ms):
@@ -173,17 +173,18 @@ def main(filename, animateOrPlotdict):
         # states evolution
         control_inp =  np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
         uav1.states_evolution(control_inp)
-        # print(control_inp)
+        # stack control inputs and full states for plotting and animating 
+        cont_stack = np.concatenate((cont_stack, control_inp.reshape(1,4)))       
         full_state = np.concatenate((full_state, fullState.reshape(1,13)))
     full_state = np.delete(full_state, 0, 0)
     ref_state  = np.delete(ref_state, 0, 0)
-
+    cont_stack = np.delete(cont_stack, 0, 0)
     # Animation    
     filename  = filename.replace('trajectoriescsv/', '')
     filename  = filename.replace('.csv', '')
     videoname = filename   +'.gif'
     pdfName   = filename   +'.pdf'
-    animateOrPlot(uav1, full_state, ref_state, animateOrPlotdict, videoname, pdfName, tf_sim)    
+    animateOrPlot(uav1, full_state, ref_state, cont_stack, animateOrPlotdict, videoname, pdfName, tf_sim)    
        
 
 if __name__ == '__main__':

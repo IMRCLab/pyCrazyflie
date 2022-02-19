@@ -1,33 +1,42 @@
 import numpy as np
 import rowan as rn
 import matplotlib.pyplot as plt
+import matplotlib.ticker as plticker
 from mpl_toolkits import mplot3d 
 import matplotlib.animation as animation
 from matplotlib.backends.backend_pdf import PdfPages
-from matplotlib.gridspec import SubplotSpec
+from matplotlib.gridspec import SubplotSpec, GridSpec
 from uavDy import uav
 
 def create_subtitle(fig: plt.Figure, grid: SubplotSpec, title: str):
     row = fig.add_subplot(grid)
-    row.set_title('\n\n\n'+title, fontweight='medium',fontsize='small')
+    row.set_title('\n\n\n'+title, fontweight='medium',fontsize='medium')
     row.set_frame_on(False)
     row.axis('off')
 
-def outputPlots(ref_state, full_state, savePlot, tf_sim, pdfName):
+def outputPlots(ref_state, full_state, cont_stack, savePlot, tf_sim, pdfName):
     print('Plotting...')
     plt.rcParams['axes.grid'] = True
     
-    fig1, ax1 = plt.subplots(2, 3, sharex=True ,sharey=True, squeeze=True)
-    # fig1.set_size_inches(18, 4)
+    fig1, ax1 = plt.subplots(2, 3, sharex=True ,sharey=True)
     fig1.tight_layout()
     
-    fig2, ax2 = plt.subplots(2, 3, sharex=True, sharey=True, squeeze=True)
-    # fig2.set_size_inches(18, 4)
+    fig2, ax2 = plt.subplots(2, 3, sharex=True, sharey=True)
     fig2.tight_layout()
 
-    fig3, ax3 = plt.subplots(3, 1, sharex=True ,sharey=True, squeeze=True)
-    # fig3.set_size_inches(18, 4)
+    fig3, ax3 = plt.subplots(3, 1, sharex=True ,sharey=True)
     fig3.tight_layout()
+
+    fig4, ax4 = plt.subplots(2, 3, sharex=True ,sharey=True)
+    fig4.tight_layout()
+
+    fig5 = plt.figure(constrained_layout=True)
+    gs = GridSpec(3, 2, figure=fig5)
+
+    ax5 = fig5.add_subplot(gs[:, 0])
+    ax6 = fig5.add_subplot(gs[0,1])
+    ax7 = fig5.add_subplot(gs[1,1],sharey=ax6)
+    ax8 = fig5.add_subplot(gs[2,1],sharey=ax6)
 
     time   = np.linspace(0, tf_sim*1e-3, num=len(full_state)) 
     pos    = full_state[:,0:3]
@@ -38,40 +47,80 @@ def outputPlots(ref_state, full_state, savePlot, tf_sim, pdfName):
     linVeldes = ref_state[:,3::]
     ts = 'time [s]'
     
-    ax1[0,0].plot(time, pos[:,0]), ax1[0,1].plot(time, pos[:,1]), ax1[0,2].plot(time, pos[:,2])
+    poserr  = (posdes[:,:] - pos[:,:]).reshape(len(full_state),3)
+    linVerr = (linVeldes[:,:] - linVel[:,:]).reshape(len(full_state),3) 
+
+    ###################################
+
+    ax1[0,0].plot(time, pos[:,0], c='g', lw=0.9), ax1[0,1].plot(time, pos[:,1], lw=0.9, c='g'), ax1[0,2].plot(time, pos[:,2], lw=0.9, c='g')
     ax1[0,0].set_ylabel('x [m]',), ax1[0,1].set_ylabel('y [m]'), ax1[0,2].set_ylabel('z [m]')
-    ax1[1,0].plot(time, posdes[:,0]), ax1[1,1].plot(time, posdes[:,1]), ax1[1,2].plot(time, posdes[:,2])
+    ax1[1,0].plot(time, posdes[:,0], lw=0.9), ax1[1,1].plot(time, posdes[:,1], lw=0.9), ax1[1,2].plot(time, posdes[:,2], lw=0.9)
     ax1[1,0].set_ylabel('x des [m]'), ax1[1,1].set_ylabel('y des [m]'), ax1[1,2].set_ylabel('z des [m]')
     fig1.supxlabel(ts,fontsize='small')
 
     grid = plt.GridSpec(2,3)
     create_subtitle(fig1, grid[0, ::], 'Actual Positions')
     create_subtitle(fig1, grid[1, ::], 'Reference Positions')
+
+    ###################################
       
-    ax2[0,0].plot(time, linVel[:,0]), ax2[0,1].plot(time, linVel[:,1]), ax2[0,2].plot(time, linVel[:,2])
+    ax2[0,0].plot(time, linVel[:,0],lw=0.9, c='g'), ax2[0,1].plot(time, linVel[:,1],lw=0.9, c='g'), ax2[0,2].plot(time, linVel[:,2],lw=0.9, c='g')
     ax2[0,0].set_ylabel('vx [m/s]'), ax2[0,1].set_ylabel('vy [m/s]'), ax2[0,2].set_ylabel('vz [m/s]')
     
-    ax2[1,0].plot(time, linVeldes[:,0]), ax2[1,1].plot(time, linVeldes[:,1]), ax2[1,2].plot(time, linVeldes[:,2])
+    ax2[1,0].plot(time, linVeldes[:,0], lw=0.9), ax2[1,1].plot(time, linVeldes[:,1], lw=0.9), ax2[1,2].plot(time, linVeldes[:,2], lw=0.9)
     ax2[1,0].set_ylabel('vx des [m/s]'), ax2[1,1].set_ylabel('vy des [m/s]'), ax2[1,2].set_ylabel('vz des [m/s]')
     fig2.supxlabel(ts,fontsize='small')
 
     grid = plt.GridSpec(2,3)
     create_subtitle(fig2, grid[0, ::], 'Actual Linear Velocities')
     create_subtitle(fig2, grid[1, ::], 'Reference Linear Velocities')
-    
-    ax3[0].plot(time, angVel[:,0])
-    ax3[1].plot(time, angVel[:,1])
-    ax3[2].plot(time, angVel[:,2])
+
+    ###################################
+
+    ax3[0].plot(time, angVel[:,0],c='g',lw=1)
+    ax3[1].plot(time, angVel[:,1],c='g',lw=1)
+    ax3[2].plot(time, angVel[:,2],c='g',lw=1)
     ax3[0].set_ylabel('wx [deg/s]',labelpad=-5), ax3[1].set_ylabel('wy [deg/s]',labelpad=-5), ax3[2].set_ylabel('wz [deg/s]',labelpad=-5)
     fig3.supxlabel(ts,fontsize='small')
 
     grid = plt.GridSpec(3,1)
     create_subtitle(fig3, grid[0, ::], 'Actual Angular Velocities')
+
+    ###################################
+
+    ax4[0,0].plot(time, poserr[:,0],c='r',lw=0.9), ax4[0,1].plot(time, poserr[:,1],c='r',lw=0.9), ax4[0,2].plot(time, poserr[:,2],c='r',lw=0.9)
+    ax4[0,0].set_ylabel('ex [m/s]'), ax4[0,1].set_ylabel('ey [m/s]'), ax4[0,2].set_ylabel('ez [m/s]')
+    
+    ax4[1,0].plot(time, linVerr[:,0],c='r',lw=0.9), ax4[1,1].plot(time, linVerr[:,1],c='r',lw=0.9), ax4[1,2].plot(time, linVerr[:,2],c='r',lw=0.9)
+    ax4[1,0].set_ylabel('vex des [m/s]'), ax4[1,1].set_ylabel('vey des [m/s]'), ax4[1,2].set_ylabel('vez des [m/s]')
+    fig4.supxlabel(ts,fontsize='small')
+
+    grid = plt.GridSpec(2,3)
+    create_subtitle(fig4, grid[0, ::], 'Positional errors')
+    create_subtitle(fig4, grid[1, ::], 'Linear Velocities errors')
+    
+    ###################################
+
+    ax5.plot(time, cont_stack[:,0],lw=1, c='k')
+    ax5.set_ylabel('fz [N]')
+    
+    ax6.plot(time, cont_stack[:,1], lw=0.9, c='k'), ax7.plot(time, cont_stack[:,2], lw=0.9, c='k'), ax8.plot(time, cont_stack[:,3],lw=0.9, c='k')
+    ax6.set_ylabel('taux [N.m]',fontsize='small'), ax7.set_ylabel('tauy [N.m]',fontsize='small'), ax8.set_ylabel('tauz [N.m]',fontsize='small')
+    fig5.supxlabel(ts,fontsize='small')
+
+    create_subtitle(fig5, gs[::, 0], 'Force Control Input')
+    create_subtitle(fig5, gs[::, 1], 'Torque Control Input')
+
+    ###############################
+
     if savePlot:
         with PdfPages(pdfName) as pdf:
             fig1.savefig(pdf, format='pdf', bbox_inches='tight')
             fig2.savefig(pdf, format='pdf', bbox_inches='tight')
-            fig3.savefig(pdf, format='pdf', bbox_inches='tight')    
+            fig3.savefig(pdf, format='pdf', bbox_inches='tight')
+            fig4.savefig(pdf, format='pdf', bbox_inches='tight')  
+            fig5.savefig(pdf, format='pdf', bbox_inches='tight')  
+     
     plt.show()
 
 
