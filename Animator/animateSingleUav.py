@@ -14,6 +14,22 @@ def create_subtitle(fig: plt.Figure, grid: SubplotSpec, title: str):
     row.set_frame_on(False)
     row.axis('off')
 
+def setlimits(ax, full_state):
+        edge  = 0.9
+        max_x = max(full_state[0,:])
+        max_y = max(full_state[1,:])
+        max_z = max(full_state[2,:])
+       
+        ax.set_xlim3d([-max_x-edge, max_x+edge])
+        ax.set_xlabel('X')
+        ax.set_ylim3d([-max_y-edge, max_y+edge])
+        ax.set_ylabel('Y')
+        ax.set_zlim3d([-max_z-edge, max_z+edge]) #
+        ax.set_zlabel('Z')
+        ax.legend()
+        ax.view_init(25,35)
+        return ax
+
 def outputPlots(ref_state, full_state, cont_stack, savePlot, tf_sim, pdfName):
     print('Plotting...')
     plt.rcParams['axes.grid'] = True
@@ -32,6 +48,8 @@ def outputPlots(ref_state, full_state, cont_stack, savePlot, tf_sim, pdfName):
 
     fig5 = plt.figure(constrained_layout=True)
     gs = GridSpec(3, 2, figure=fig5)
+
+     
 
     ax5 = fig5.add_subplot(gs[:, 0])
     ax6 = fig5.add_subplot(gs[0,1])
@@ -113,6 +131,12 @@ def outputPlots(ref_state, full_state, cont_stack, savePlot, tf_sim, pdfName):
 
     ###############################
 
+    fig6     = plt.figure(figsize=(10,10))
+    ax9      = fig6.add_subplot(autoscale_on=True,projection="3d")
+    ax9.plot3D(pos[:,0], pos[:,1], pos[:,2], 'k-.',lw=1.5,label="Actual Trajectory")
+    ax9.plot3D(posdes[:,0], posdes[:,1] , posdes[:,2],'g--',lw=1.5,label="Reference Trajectory")
+    ax9 = setlimits(ax9, pos)
+
     if savePlot:
         with PdfPages(pdfName) as pdf:
             fig1.savefig(pdf, format='pdf', bbox_inches='tight')
@@ -120,7 +144,7 @@ def outputPlots(ref_state, full_state, cont_stack, savePlot, tf_sim, pdfName):
             fig3.savefig(pdf, format='pdf', bbox_inches='tight')
             fig4.savefig(pdf, format='pdf', bbox_inches='tight')  
             fig5.savefig(pdf, format='pdf', bbox_inches='tight')  
-     
+            fig6.savefig(pdf, format='pdf', bbox_inches='tight')
     plt.show()
 
 
@@ -150,10 +174,8 @@ class PlotandAnimate:
         self.reference_state = reference_state
         self.uavModel        = uavModel
         # Initialize a 3d figure
-        self.fig = fig#plt.figure(figsize=(10,10))
-        self.ax  = ax#self.fig.add_subplot(autoscale_on=True,projection="3d")
-        # self.ax.view_init(25, 35)
-        # self.ax.view_init(25, -(90+35))
+        self.fig = fig
+        self.ax  = ax
         self.ax.view_init(25,35)
         # Create the lines and vectors to draw body and desired frames
         self.line, = self.ax.plot(self.full_state[0,0:1], self.full_state[1,0:1], self.full_state[2,0:1], 'b--', lw=1)
