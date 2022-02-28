@@ -77,23 +77,23 @@ def updateState(state, uavState):
                           q_curr[0],q_curr[1],q_curr[2],q_curr[3], uavState[10],uavState[11],uavState[12]]).reshape((13,))
     return state,fullState
 
-def initializeState():
+def initializeState(uav_params):
     """This function sets the initial states of the UAV
         dt: time step
         initPose: initial position [x,y,z]
         initq: initial rotations represented in quaternions 
         initLinVel: [xdot, ydot, zdot] initial linear velocities
         initAngVel: [wx, wy, wz] initial angular velocities"""
-    dt = 1e-3
-    x, y, z = 0, 0, 0.7
+    dt = float(uav_params['dt'])
+    x, y, z = float(uav_params['x']), float(uav_params['y']), float(uav_params['z'])
     initPos = np.array([x, y, z])
     # initialize Rotation matrix about Roll-Pitch-Yaw
-    roll, pitch, yaw  = np.radians(0), np.radians(0), np.radians(0) 
+    roll, pitch, yaw  = np.radians(float(uav_params['roll'])), np.radians(float(uav_params['pitch'])), np.radians(float(uav_params['yaw'])) 
     initq = rn.from_euler(roll, pitch, yaw)
     #Initialize Twist
-    vx, vy, vz = 0, 0, 0
+    vx, vy, vz = float(uav_params['vx']), float(uav_params['vy']), float(uav_params['vz'])
     initLinVel = np.array([vx,vy,vz])
-    wx, wy, wz = 0, 0, 0
+    wx, wy, wz = float(uav_params['wx']), float(uav_params['wy']), float(uav_params['wz'])
     initAngVel = np.array([vx,vy,vz])
     ### State = [x, y, z, xdot, ydot, zdot, qw, qx, qy, qz, wx, wy, wz] ###
     initState = np.zeros((13,))
@@ -131,14 +131,13 @@ def animateOrPlot(uavModel, full_state, ref_state, cont_stack, animateOrPlotdict
    
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##        
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##
-def main(filename, animateOrPlotdict, uav_dy):
+def main(filename, animateOrPlotdict, uav_params):
     # Initialize an instance of a uav dynamic model with:
     # dt: time interval
     # initState: initial state
     # set it as 1 tick: i.e: 1 ms
-    dt, initState = initializeState()
-    I = np.array([[float(uav_dy['Ixx']),0,0],[0,float(uav_dy['Iyy']),0],[0,0,float(uav_dy['Izz'])]])
-    uav1 = uav.UavModel(dt, initState, m=float(uav_dy['m']) ,I=I, d=float(uav_dy['d']), cft=float(uav_dy['cft']))
+    dt, initState = initializeState(uav_params)
+    uav1 = uav.UavModel(dt, initState, uav_params)
     print(uav1)
     # Upload the traj in csv file format
     # rows: time, xdes, ydes, zdes, vxdes, vydes, vzdes, axdes, aydes, azdes
@@ -201,8 +200,8 @@ if __name__ == '__main__':
     
         import yaml
         with open('config/initialize.yaml') as f:
-            uav_dy = yaml.load(f, Loader=yaml.FullLoader)
-        main(args.filename, animateOrPlotdict, uav_dy)
+            uav_params = yaml.load(f, Loader=yaml.FullLoader)
+        main(args.filename, animateOrPlotdict, uav_params)
     except ImportError as imp:
         print(imp)
         print('Please export crazyflie-firmware/ to your PYTHONPATH')
