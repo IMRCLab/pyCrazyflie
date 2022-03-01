@@ -157,7 +157,7 @@ def main(filename, animateOrPlotdict, uav_params):
     # If you want an output always, simply select tick==0
     full_state = np.zeros((1, 13))
     ref_state  = np.zeros((1, 6))
-    cont_stack = np.zeros((1, 4))
+    cont_stack = np.zeros((1, 8))
     for tick in range(0, int(tf_sim)+1):
         # update desired state
         if tick <= int(tf_ms):
@@ -174,8 +174,10 @@ def main(filename, animateOrPlotdict, uav_params):
         # states evolution
         control_inp =  np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
         uav1.states_evolution(control_inp)
-        # stack control inputs and full states for plotting and animating 
-        cont_stack = np.concatenate((cont_stack, control_inp.reshape(1,4)))       
+        # stack control inputs and full states for plotting and animating
+        u_mot = uav1.invAll @ control_inp
+        contr_inps = np.array([control_inp , u_mot]).reshape((1,8))
+        cont_stack = np.concatenate((cont_stack, contr_inps.reshape(1,8)))       
         full_state = np.concatenate((full_state, fullState.reshape(1,13)))
     full_state = np.delete(full_state, 0, 0)
     ref_state  = np.delete(ref_state, 0, 0)
