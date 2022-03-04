@@ -5,9 +5,8 @@ from uavDy import uav
 from Animator import animateSingleUav 
 from trajectoriescsv import *
 import time
-# import sys
-# sys.path.append('crazyflie-firmware/')
-# import cffirmware
+import argparse
+
 np.set_printoptions(linewidth=np.inf)
 np.set_printoptions(suppress=True)
 
@@ -78,23 +77,23 @@ def updateState(state, uavState):
                           q_curr[0],q_curr[1],q_curr[2],q_curr[3], uavState[10],uavState[11],uavState[12]]).reshape((13,))
     return state,fullState
 
-def initializeState():
+def initializeState(uav_params):
     """This function sets the initial states of the UAV
         dt: time step
         initPose: initial position [x,y,z]
         initq: initial rotations represented in quaternions 
         initLinVel: [xdot, ydot, zdot] initial linear velocities
         initAngVel: [wx, wy, wz] initial angular velocities"""
-    dt = 1e-3
-    x, y, z = 0, 0, 0.7
+    dt = float(uav_params['dt'])
+    x, y, z = float(uav_params['x']), float(uav_params['y']), float(uav_params['z'])
     initPos = np.array([x, y, z])
     # initialize Rotation matrix about Roll-Pitch-Yaw
-    roll, pitch, yaw  = np.radians(0), np.radians(0), np.radians(0) 
+    roll, pitch, yaw  = np.radians(float(uav_params['roll'])), np.radians(float(uav_params['pitch'])), np.radians(float(uav_params['yaw'])) 
     initq = rn.from_euler(roll, pitch, yaw)
     #Initialize Twist
-    vx, vy, vz = 0, 0, 0
+    vx, vy, vz = float(uav_params['vx']), float(uav_params['vy']), float(uav_params['vz'])
     initLinVel = np.array([vx,vy,vz])
-    wx, wy, wz = 0, 0, 0
+    wx, wy, wz = float(uav_params['wx']), float(uav_params['wy']), float(uav_params['wz'])
     initAngVel = np.array([vx,vy,vz])
     ### State = [x, y, z, xdot, ydot, zdot, qw, qx, qy, qz, wx, wy, wz] ###
     initState = np.zeros((13,))
@@ -118,33 +117,35 @@ def animateTrajectory(uavModel, full_state, ref_state, videoname):
     plt.close(fig)
     print("Run time:  {:.3f}s".format((end - now)))
 
-def animateOrPlot(uavModel, full_state, ref_state, animateOrPlotdict, videoname, pdfName, tf_sim): 
-    if animateOrPlotdict['animte'] and animateOrPlotdict['savePlot']:
-        animateTrajectory(uavModel , full_state, ref_state, videoname) 
-        animateSingleUav.outputPlots(ref_state, full_state, animateOrPlotdict['savePlot'], tf_sim, pdfName)       
-    elif animateOrPlotdict['animte']:
+def animateOrPlot(uavModel, full_state, ref_state, cont_stack, animateOrPlotdict, videoname, pdfName, tf_sim): 
+    if animateOrPlotdict['animate'] and animateOrPlotdict['savePlot']:
         animateTrajectory(uavModel , full_state, ref_state, videoname)
+        animateSingleUav.outputPlots(ref_state, full_state, cont_stack, animateOrPlotdict['savePlot'], tf_sim, pdfName)     
+    elif animateOrPlotdict['animate']:
+        animateTrajectory(uavModel , full_state, ref_state, videoname)
+        print('Animation')
     else:
-        # The plot will be saved as a pdf eitherways
-        # showPlot: plt.show(), just to show the plot after running
-        animateSingleUav.outputPlots(ref_state, full_state, animateOrPlotdict['savePlot'], tf_sim, pdfName)
+        # The plot will be shown eitherways
+        # savePlot: saves plot in pdf format
+        animateSingleUav.outputPlots(ref_state, full_state, cont_stack, animateOrPlotdict['savePlot'], tf_sim, pdfName)
    
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##        
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##
-def main():
+def main(filename, animateOrPlotdict, uav_params):
     # Initialize an instance of a uav dynamic model with:
     # dt: time interval
     # initState: initial state
     # set it as 1 tick: i.e: 1 ms
-    dt, initState = initializeState()
-    uav1 = uav.UavModel(dt, initState)
+    dt, initState = initializeState(uav_params)
+    uav1 = uav.UavModel(dt, initState, uav_params)
+    print(uav1)
     # Upload the traj in csv file format
     # rows: time, xdes, ydes, zdes, vxdes, vydes, vzdes, axdes, aydes, azdes
-    filename = "infinity8"
-    # timeStamped_traj = np.genfromtxt(filename+'.csv', delimiter=',')
-    timeStamped_traj = np.loadtxt('trajectoriescsv/'+filename +'.csv', delimiter=',')   
+    # timeStamped_traj = np.genfromtxt(filename, delimiter=',')
+    timeStamped_traj = np.loadtxt(filename, delimiter=',')   
     # final time of traj in ms
     tf_ms = timeStamped_traj[0,-1]*1e3
+    print('\n Total trajectory time: '+str(tf_ms*1e-3)+ 's')
     # Simulation time
     tf_sim = tf_ms + 3e3
     #initialize the controller and allocate current state (both sensor and state are the state)
@@ -154,9 +155,9 @@ def main():
     # note that the attitude controller will only compute a new output at 500 Hz
     # and the position controller only at 100 Hz
     # If you want an output always, simply select tick==0
-    full_state = np.zeros((1,13))
-    ref_state  = np.zeros((1 ,6))
-    
+    full_state = np.zeros((1, 13))
+    ref_state  = np.zeros((1, 6))
+    cont_stack = np.zeros((1, 8))
     for tick in range(0, int(tf_sim)+1):
         # update desired state
         if tick <= int(tf_ms):
@@ -173,22 +174,36 @@ def main():
         # states evolution
         control_inp =  np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
         uav1.states_evolution(control_inp)
-        print(control_inp)
+        # stack control inputs and full states for plotting and animating
+        u_mot = uav1.invAll @ control_inp
+        contr_inps = np.array([control_inp , u_mot]).reshape((1,8))
+        cont_stack = np.concatenate((cont_stack, contr_inps.reshape(1,8)))       
         full_state = np.concatenate((full_state, fullState.reshape(1,13)))
     full_state = np.delete(full_state, 0, 0)
     ref_state  = np.delete(ref_state, 0, 0)
-
+    cont_stack = np.delete(cont_stack, 0, 0)
     # Animation    
-    animateOrPlotdict = {'animte':True, 'savePlot':True}
-    videoname = filename +'.gif'
-    pdfName = filename +'.pdf'
-    animateOrPlot(uav1, full_state, ref_state, animateOrPlotdict, videoname, pdfName, tf_sim)    
+    filename  = filename.replace('trajectoriescsv/', '')
+    filename  = filename.replace('.csv', '')
+    videoname = filename   +'.gif'
+    pdfName   = filename   +'.pdf'
+    animateOrPlot(uav1, full_state, ref_state, cont_stack, animateOrPlotdict, videoname, pdfName, tf_sim)    
        
 
 if __name__ == '__main__':
     try: 
-      import cffirmware
-      main()
+        import cffirmware
+        parser = argparse.ArgumentParser()
+        parser.add_argument('filename', type=str, help="Name of the CSV file in trajectoriescsv directory")
+        parser.add_argument('--animate', default=False, action='store_true', help='Set true to save a gif in Videos directory')
+        parser.add_argument('--savePlot', default=False, action='store_true', help='Set true to save plots in a pdf  format')
+        args   = parser.parse_args()   
+        animateOrPlotdict = {'animate':args.animate, 'savePlot':args.savePlot}
+    
+        import yaml
+        with open('config/initialize.yaml') as f:
+            uav_params = yaml.load(f, Loader=yaml.FullLoader)
+        main(args.filename, animateOrPlotdict, uav_params)
     except ImportError as imp:
         print(imp)
         print('Please export crazyflie-firmware/ to your PYTHONPATH')

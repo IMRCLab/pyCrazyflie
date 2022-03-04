@@ -1,0 +1,23 @@
+## DYNAMIC PARAMETERS
+m   : 0.028
+Ixx : 16.571710e-6
+Iyy : 16.655602e-6
+Izz : 29.261652e-6
+d: 4e-3
+cft: 0.005964552 
+
+## TIME STEP 
+dt : 1e-3
+## INITIAL CONDITIONS
+x     : 0
+y     : 0
+z     : 0.7
+roll  : 0
+pitch : 0
+yaw   : 0
+vx    : 0
+vy    : 0
+vz    : 0
+wx    : 0
+wy    : 0
+wz    : 0
