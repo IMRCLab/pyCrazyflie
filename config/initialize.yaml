@@ -5,13 +5,13 @@ Iyy : 16.655602e-6
 Izz : 29.261652e-6
 d: 4e-3
 cft: 0.005964552 
-
+drag: 0 # 0: do not include drag model, 1: include simple drag model
 ## TIME STEP 
 dt : 1e-3
 ## INITIAL CONDITIONS
 x     : 0
 y     : 0
-z     : 0.7
+z     : 0
 roll  : 0
 pitch : 0
 yaw   : 0

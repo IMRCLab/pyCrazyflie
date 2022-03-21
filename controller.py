@@ -6,6 +6,7 @@ from Animator import animateSingleUav
 from trajectoriescsv import *
 import time
 import argparse
+import sys
 
 np.set_printoptions(linewidth=np.inf)
 np.set_printoptions(suppress=True)
@@ -81,7 +82,7 @@ def initializeState(uav_params):
     """This function sets the initial states of the UAV
         dt: time step
         initPose: initial position [x,y,z]
-        initq: initial rotations represented in quaternions 
+        initq: [qw, qx, qy, qz] initial rotations represented in quaternions 
         initLinVel: [xdot, ydot, zdot] initial linear velocities
         initAngVel: [wx, wy, wz] initial angular velocities"""
     dt = float(uav_params['dt'])
@@ -146,6 +147,7 @@ def main(filename, animateOrPlotdict, uav_params):
     # final time of traj in ms
     tf_ms = timeStamped_traj[0,-1]*1e3
     print('\n Total trajectory time: '+str(tf_ms*1e-3)+ 's')
+    print('Simulating...')
     # Simulation time
     tf_sim = tf_ms + 3e3
     #initialize the controller and allocate current state (both sensor and state are the state)
@@ -179,6 +181,7 @@ def main(filename, animateOrPlotdict, uav_params):
         contr_inps = np.array([control_inp , u_mot]).reshape((1,8))
         cont_stack = np.concatenate((cont_stack, contr_inps.reshape(1,8)))       
         full_state = np.concatenate((full_state, fullState.reshape(1,13)))
+ # Cursor up one line
     full_state = np.delete(full_state, 0, 0)
     ref_state  = np.delete(ref_state, 0, 0)
     cont_stack = np.delete(cont_stack, 0, 0)

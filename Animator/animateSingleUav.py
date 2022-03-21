@@ -15,20 +15,30 @@ def create_subtitle(fig: plt.Figure, grid: SubplotSpec, title: str):
     row.axis('off')
 
 def setlimits(ax, full_state):
-        edge  = 0.9
-        max_x = max(full_state[0,:])
-        max_y = max(full_state[1,:])
-        max_z = max(full_state[2,:])
-       
-        ax.set_xlim3d([-max_x-edge, max_x+edge])
-        ax.set_xlabel('X')
-        ax.set_ylim3d([-max_y-edge, max_y+edge])
-        ax.set_ylabel('Y')
-        ax.set_zlim3d([-max_z-edge, max_z+edge]) #
-        ax.set_zlabel('Z')
-        ax.legend()
-        ax.view_init(25,35)
-        return ax
+    s     = 4
+    edge  = 0.9
+    max_x = max(full_state[:,0])
+    max_y = max(full_state[:,1])
+    max_z = max(full_state[:,2])
+    if (max_x >= max_y) and (max_x >= max_z):
+        max_ = max_x
+        ax.set_xlim3d([-max_-edge, max_+edge])
+        ax.set_ylim3d([-(max_/s)-edge, (max_/s)+edge])
+        ax.set_zlim3d([-max_/s-edge, max_/s+edge])
+    elif (max_y >= max_x) and (max_y >= max_z):
+        max_ = max_y
+        ax.set_xlim3d([-max_/s-edge, max_/s+edge])
+        ax.set_ylim3d([-max_-edge, max_+edge])
+        ax.set_zlim3d([-max_/s-edge, max_/s+edge])
+    else:
+        max_ = max_z
+        ax.set_xlim3d([-max_/s-edge, max_/s+edge])
+        ax.set_ylim3d([-max_/s-edge, max_/s+edge])
+        ax.set_zlim3d([-max_-edge, max_+edge])
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    return ax
 
 def outputPlots(ref_state, full_state, cont_stack, savePlot, tf_sim, pdfName):
     print('Plotting...')
@@ -76,13 +86,10 @@ def outputPlots(ref_state, full_state, cont_stack, savePlot, tf_sim, pdfName):
     ax1[0].plot(time, posdes[:,0], lw=0.75, c='darkgreen',label='Reference'), ax1[1].plot(time, posdes[:,1], lw=0.75, c='darkgreen'), ax1[2].plot(time, posdes[:,2], lw=0.75, c='darkgreen')
     ax1[0].set_ylabel('x [m]',), ax1[1].set_ylabel('y [m]'), ax1[2].set_ylabel('z [m]')
     ax1[0].legend()
-    # ax1[1,0].plot(time, posdes[:,0], lw=0.9), ax1[1,1].plot(time, posdes[:,1], lw=0.9), ax1[1,2].plot(time, posdes[:,2], lw=0.9)
-    # ax1[1,0].set_ylabel('x des [m]'), ax1[1,1].set_ylabel('y des [m]'), ax1[1,2].set_ylabel('z des [m]')
     fig1.supxlabel(ts,fontsize='small')
 
     grid = plt.GridSpec(3,1)
     create_subtitle(fig1, grid[0, ::], 'Actual vs Reference Positions')
-    # create_subtitle(fig1, grid[1, ::], 'Reference Positions')
 
     ###################################
       
@@ -90,13 +97,10 @@ def outputPlots(ref_state, full_state, cont_stack, savePlot, tf_sim, pdfName):
     ax2[0].plot(time, linVeldes[:,0],lw=0.75, c='darkgreen',label='Reference'), ax2[1].plot(time, linVeldes[:,1],lw=0.75, c='darkgreen'), ax2[2].plot(time, linVeldes[:,2],lw=0.75, c='darkgreen')
     ax2[0].set_ylabel('vx [m/s]'), ax2[1].set_ylabel('vy [m/s]'), ax2[2].set_ylabel('vz [m/s]')
     ax2[0].legend()
-    # ax2[1,0].plot(time, linVeldes[:,0], lw=0.9), ax2[1,1].plot(time, linVeldes[:,1], lw=0.9), ax2[1,2].plot(time, linVeldes[:,2], lw=0.9)
-    # ax2[1,0].set_ylabel('vx des [m/s]'), ax2[1,1].set_ylabel('vy des [m/s]'), ax2[1,2].set_ylabel('vz des [m/s]')
     fig2.supxlabel(ts,fontsize='small')
 
     grid = plt.GridSpec(3,1)
     create_subtitle(fig2, grid[0, ::], 'Actual vs Reference Linear Velocities')
-    # create_subtitle(fig2, grid[1, ::], 'Reference Linear Velocities')
 
     ###################################
 
@@ -215,16 +219,29 @@ class PlotandAnimate:
         self.ani.save('Videos/'+videoname)
 
     def setlimits(self):
+        s     = 2
         edge  = 0.9
-        max_x = max(self.full_state[0,:])
-        max_y = max(self.full_state[1,:])
-        max_z = max(self.full_state[2,:])
+        max_x = max(self.full_state[:,0])
+        max_y = max(self.full_state[:,1])
+        max_z = max(self.full_state[:,2])
+        if (max_x >= max_y) and (max_x >= max_z):
+            max_ = max_x
+            self.ax.set_xlim3d([-max_-edge, max_+edge])
+            self.ax.set_ylim3d([-max_/s-edge, max_/s+edge])
+            self.ax.set_zlim3d([-max_/s-edge, max_/s+edge])
+        elif (max_y >= max_x) and (max_y >= max_z):
+            max_ = max_y
+            self.ax.set_xlim3d([-max_/s-edge, max_/s+edge])
+            self.ax.set_ylim3d([-max_-edge, max_+edge])
+            self.ax.set_zlim3d([-max_/s-edge, max_/s+edge])
+        else:
+            max_ = max_z
+            self.ax.set_xlim3d([-(max_/s)-edge, (max_/s)+edge])
+            self.ax.set_ylim3d([-(max_/s)-edge, (max_/s)+edge])
+            self.ax.set_zlim3d([-max_-edge, max_+edge])
        
-        self.ax.set_xlim3d([-max_x-edge, max_x+edge])
         self.ax.set_xlabel('X')
-        self.ax.set_ylim3d([-max_y-edge, max_y+edge])
         self.ax.set_ylabel('Y')
-        self.ax.set_zlim3d([-max_z-edge, max_z+edge]) #
         self.ax.set_zlabel('Z')
 
     def drawQuivers(self, x, y, z, q, xref, yref, zref):
