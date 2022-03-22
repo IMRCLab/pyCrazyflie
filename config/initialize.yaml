@@ -6,12 +6,28 @@ Izz : 29.261652e-6
 d: 4e-3
 cft: 0.005964552 
 drag: 0 # 0: do not include drag model, 1: include simple drag model
-## TIME STEP 
-dt : 1e-3
-## INITIAL CONDITIONS
+## Payload Properties
+payload: 0 # Payload flag, 0: no payload, 1: payload
+m_p: 0.01 # Mass payload [kg]
+l_c: 0.7  # Length of cable [m]
+## INITIAL CONDITIONS FOR PAYLOAD
+xl  :  0
+yl  :  0
+zl  :  0
+vxl :  0
+vyl :  0
+vzl :  0
+px  :  0  # Initial condition for directional unit vector from UAV to payload
+py  :  0  # p = [0,0,-1]
+pz  :  -1  # pointing downwards expressed in Inertial Frame
+wxl :  0
+wyl :  0 # Angular velocity of payload
+wzl :  0
+
+## INITIAL CONDITIONS for UAV
 x     : 0
 y     : 0
-z     : 0
+z     : 0.7
 roll  : 0
 pitch : 0
 yaw   : 0
@@ -21,3 +37,6 @@ vz    : 0
 wx    : 0
 wy    : 0
 wz    : 0
+
+## TIME STEP 
+dt : 1e-3

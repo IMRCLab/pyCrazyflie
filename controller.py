@@ -2,6 +2,7 @@ import numpy as np
 import rowan as rn
 import matplotlib.pyplot as plt
 from uavDy import uav
+from uavDy.uav import skew
 from Animator import animateSingleUav 
 from trajectoriescsv import *
 import time
@@ -48,15 +49,39 @@ def updateDesState(setpoint, fulltraj):
     # setpoint.attitude.yaw = 0  # deg
     return setpoint
     
-def updateSensor(sensors, uavState):
+def updateSensor(sensors, uav):
     """This function updates the sensors signals"""
+    if len(uav.state) == 19:
+        uavState = np.zeros((13,))
+        posq = uav.state[0:3] - uav.lc * uav.state[6:9]
+        pdot = np.cross(uav.state[9:12], uav.state[6:9])
+        velq = uav.state[3:6] - uav.lc * pdot
+        uavState[0:3]  = posq
+        uavState[3:6]  = velq
+        uavState[6:10] = uav.state[12:16]
+        uavState[10::] =  uav.state[16::]
+    else:
+        uavState = uav.state
     sensors.gyro.x = np.degrees(uavState[10]) # deg/s
     sensors.gyro.y = np.degrees(uavState[11]) # deg/s
     sensors.gyro.z = np.degrees(uavState[12]) # deg/s
     return sensors
 
 
-def updateState(state, uavState):
+def updateState(state, uav):
+    uavState = np.zeros((13,))
+    if len(uav.state) == 19:
+        posq = uav.state[0:3] - uav.lc * uav.state[6:9]
+        # print(posq, uav.lc, uav.state[6:9])
+        pdot = np.cross(uav.state[9:12], uav.state[6:9])
+        velq = uav.state[3:6] - uav.lc * pdot
+        uavState[0:3]  = posq
+        uavState[3:6]  = velq
+        uavState[6:10] = uav.state[12:16]
+        uavState[10::] =  uav.state[16::]
+    else:
+        uavState = uav.state
+
     """This function passes the current states to the controller"""
     state.position.x = uavState[0]   # m
     state.position.y = uavState[1]    # m
@@ -95,7 +120,7 @@ def initializeState(uav_params):
     vx, vy, vz = float(uav_params['vx']), float(uav_params['vy']), float(uav_params['vz'])
     initLinVel = np.array([vx,vy,vz])
     wx, wy, wz = float(uav_params['wx']), float(uav_params['wy']), float(uav_params['wz'])
-    initAngVel = np.array([vx,vy,vz])
+    initAngVel = np.array([wx,wy,wz])
     ### State = [x, y, z, xdot, ydot, zdot, qw, qx, qy, qz, wx, wy, wz] ###
     initState = np.zeros((13,))
     initState[0:3]  = initPos  # position: x,y,z
@@ -103,6 +128,50 @@ def initializeState(uav_params):
     initState[6:10] = initq# quaternions: [qw, qx, qy, qz]
     initState[10::] = initAngVel # angular velocity: wx, wy, wz
     return dt, initState
+
+
+
+def initializeStateWithPayload(uav_params):
+    """This function sets the initial states of the UAV-Payload system
+        dt: time step
+        initPose: initial payload position [xl,yl,zl]
+        initLinVel: [xldot, yldot, zldot] initial linear velocities
+        initp: initial directional unit vector pointing from UAV to payload expressed in Inertial frame
+        initq: [qw, qx, qy, qz] initial rotations represented in quaternions 
+        initAngVel: [wx, wy, wz] initial angular velocities"""
+
+    dt = float(uav_params['dt'])
+    lc = float(uav_params['l_c']) # length of cable [m] 
+    xl, yl, zl = float(uav_params['xl']), float(uav_params['yl']), float(uav_params['zl'])
+    px, py, pz = float(uav_params['px']), float(uav_params['py']), float(uav_params['pz'])
+    
+    initPosL = np.array([xl, yl, zl]) #  Initial position
+    initp    = np.array([px, py, pz]) #  Initial Unit vector
+
+     #Initialize payload Twist
+    vxl, vyl, vzl = float(uav_params['vxl']), float(uav_params['vyl']), float(uav_params['vzl'])
+    wxl, wyl, wzl = float(uav_params['wxl']), float(uav_params['wyl']), float(uav_params['wzl'])
+    
+    inLinVL  = np.array([vxl, vyl, vzl]) # Linear velocity of payload
+    inAnVL   = np.array([wxl, wyl, wzl]) # Angular Velocity of Payload
+    
+    # initialize Rotation matrix: Roll-Pitch-Yaw
+    roll, pitch, yaw  = np.radians(float(uav_params['roll'])), np.radians(float(uav_params['pitch'])), np.radians(float(uav_params['yaw'])) 
+    initq = rn.from_euler(roll, pitch, yaw)    
+
+    # Initialize anglular velocity of quadrotor
+    wx, wy, wz = float(uav_params['wx']), float(uav_params['wy']), float(uav_params['wz'])
+    initAngVel = np.array([wx,wy,wz])
+    
+    initState  = np.zeros((19,))
+    initState[0:3]   = initPosL
+    initState[3:6]   = inLinVL
+    initState[6:9]   = initp
+    initState[9:12]  = inAnVL
+    initState[12:16] = initq
+    initState[16::]  = initAngVel
+    return dt, initState
+
 
 def animateTrajectory(uavModel, full_state, ref_state, videoname):
     # Animation    
@@ -137,7 +206,12 @@ def main(filename, animateOrPlotdict, uav_params):
     # dt: time interval
     # initState: initial state
     # set it as 1 tick: i.e: 1 ms
-    dt, initState = initializeState(uav_params)
+    # loadF: payload flag, 0: no payload, 1: payload 
+    loadF = float(uav_params['payload']) 
+    if loadF:
+        dt, initState = initializeStateWithPayload(uav_params)
+    else:
+        dt, initState = initializeState(uav_params)
     uav1 = uav.UavModel(dt, initState, uav_params)
     print(uav1)
     # Upload the traj in csv file format
@@ -169,13 +243,16 @@ def main(filename, animateOrPlotdict, uav_params):
             setpoint = updateDesState(setpoint, timeStamped_traj[1::,-1])
             ref_state  = np.concatenate((ref_state, timeStamped_traj[1:7,-1].reshape((1,6))))
         # update current state
-        state,fullState = updateState(state, uav1.state)
-        sensors         = updateSensor(sensors, uav1.state)
+        state,fullState = updateState(state, uav1)
+        sensors         = updateSensor(sensors, uav1)
         # query the controller
         cffirmware.controllerSJC(control, setpoint, sensors, state, tick)
         # states evolution
         control_inp =  np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
-        uav1.states_evolution(control_inp)
+        if loadF:
+         uav1.PL_nextState(control_inp)
+        else:
+            uav1.states_evolution(control_inp)
         # stack control inputs and full states for plotting and animating
         u_mot = uav1.invAll @ control_inp
         contr_inps = np.array([control_inp , u_mot]).reshape((1,8))
