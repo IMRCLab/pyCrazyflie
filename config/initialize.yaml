@@ -1,42 +1,30 @@
 ## DYNAMIC PARAMETERS
-m   : 0.028
-Ixx : 16.571710e-6
-Iyy : 16.655602e-6
-Izz : 29.261652e-6
-d: 4e-3
-cft: 0.005964552 
-drag: 0 # 0: do not include drag model, 1: include simple drag model
+
 ## Payload Properties
-payload: 1 # Payload flag, 0: no payload, 1: payload
-m_p: 0.01 # Mass payload [kg]
-l_c: 1 # Length of cable [m]
-## INITIAL CONDITIONS FOR PAYLOAD
-xl  :  1.5
-yl  :  0
-zl  :  -1
-vxl :  0
-vyl :  0
-vzl :  0
-px  :  0  # Initial condition for directional unit vector from UAV to payload
-py  :  0  # p = [0,0,-1]
-pz  :  -1  # pointing downwards expressed in Inertial Frame
-wxl :  0
-wyl :  0 # Angular velocity of payload
-wzl :  0
+payload:  # Payload flag, 0: no payload, 1: payload
+  mode: "enabled"
+  m_p: 0.01 # Mass payload [kg]
+  l_c: 1 # Length of cable [m]
+  ## INITIAL CONDITIONS FOR PAYLOAD
+  init_pos_L  :  [1.5, 0, -1]
+  init_linV_L :  [0,   0,  0]
+  p           :  [0,   0, -1] # Initial condition for directional unit vector from UAV to payload
+                                                # p = [0,0,-1]
+                                 # pointing downwards expressed in Inertial Frame
+  wl          :  [0,   0,  0] # Angular velocity of payload
+  
 
 ## INITIAL CONDITIONS for UAV
-x     : 1.5
-y     : 0
-z     : 0.7
-roll  : 0
-pitch : 0
-yaw   : 0
-vx    : 0
-vy    : 0
-vz    : 0
-wx    : 0
-wy    : 0
-wz    : 0
+quadrotor:
+  m   : 0.028
+  I   : [16.571710e-6, 16.655602e-6, 29.261652e-6]
+  d: 4e-3
+  cft: 0.005964552 
+  drag: 0 # 0: do not include drag model, 1: include simple drag model
+  init_pos_Q      : [1.5, 0, 0.7]
+  init_attitude_Q : [0,  0,  0] 
+  init_linVel_Q   : [0,  0,  0]
+  init_angVel_Q   : [0,  0,  0]
 
 ## TIME STEP 
 dt : 1e-3

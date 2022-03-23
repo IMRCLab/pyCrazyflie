@@ -111,16 +111,18 @@ def initializeState(uav_params):
         initLinVel: [xdot, ydot, zdot] initial linear velocities
         initAngVel: [wx, wy, wz] initial angular velocities"""
     dt = float(uav_params['dt'])
-    x, y, z = float(uav_params['x']), float(uav_params['y']), float(uav_params['z'])
-    initPos = np.array([x, y, z])
+    quad_prop = uav_params['quadrotor']
+    initPos = np.array(quad_prop['init_pos_Q'])
+    
     # initialize Rotation matrix about Roll-Pitch-Yaw
-    roll, pitch, yaw  = np.radians(float(uav_params['roll'])), np.radians(float(uav_params['pitch'])), np.radians(float(uav_params['yaw'])) 
-    initq = rn.from_euler(roll, pitch, yaw)
+    attitude = quad_prop['init_attitude_Q'] 
+    for i in range(0,len(attitude)):
+        attitude[i] = np.radians(attitude[i])
+    initq = rn.from_euler(attitude[0],attitude[1],attitude[2])    
+    
     #Initialize Twist
-    vx, vy, vz = float(uav_params['vx']), float(uav_params['vy']), float(uav_params['vz'])
-    initLinVel = np.array([vx,vy,vz])
-    wx, wy, wz = float(uav_params['wx']), float(uav_params['wy']), float(uav_params['wz'])
-    initAngVel = np.array([wx,wy,wz])
+    initLinVel = np.array(quad_prop['init_linVel_Q'])
+    initAngVel = np.array(quad_prop['init_angVel_Q'])
     ### State = [x, y, z, xdot, ydot, zdot, qw, qx, qy, qz, wx, wy, wz] ###
     initState = np.zeros((13,))
     initState[0:3]  = initPos  # position: x,y,z
@@ -139,29 +141,26 @@ def initializeStateWithPayload(uav_params):
         initp: initial directional unit vector pointing from UAV to payload expressed in Inertial frame
         initq: [qw, qx, qy, qz] initial rotations represented in quaternions 
         initAngVel: [wx, wy, wz] initial angular velocities"""
-
+    payload_prop = uav_params['payload']
     dt = float(uav_params['dt'])
-    lc = float(uav_params['l_c']) # length of cable [m] 
-    xl, yl, zl = float(uav_params['xl']), float(uav_params['yl']), float(uav_params['zl'])
-    px, py, pz = float(uav_params['px']), float(uav_params['py']), float(uav_params['pz'])
+    lc = float(payload_prop['l_c']) # length of cable [m] 
     
-    initPosL = np.array([xl, yl, zl]) #  Initial position
-    initp    = np.array([px, py, pz]) #  Initial Unit vector
+    initPosL = np.array(payload_prop['init_pos_L']) #  Initial position
+    initp    = np.array(payload_prop['p']) #  Initial Unit vector
 
      #Initialize payload Twist
-    vxl, vyl, vzl = float(uav_params['vxl']), float(uav_params['vyl']), float(uav_params['vzl'])
-    wxl, wyl, wzl = float(uav_params['wxl']), float(uav_params['wyl']), float(uav_params['wzl'])
-    
-    inLinVL  = np.array([vxl, vyl, vzl]) # Linear velocity of payload
-    inAnVL   = np.array([wxl, wyl, wzl]) # Angular Velocity of Payload
+    inLinVL  = np.array(payload_prop['init_linV_L']) # Linear velocity of payload
+    inAnVL   = np.array(payload_prop['wl']) # Angular Velocity of Payload
     
     # initialize Rotation matrix: Roll-Pitch-Yaw
-    roll, pitch, yaw  = np.radians(float(uav_params['roll'])), np.radians(float(uav_params['pitch'])), np.radians(float(uav_params['yaw'])) 
-    initq = rn.from_euler(roll, pitch, yaw)    
+    quad_prop  = uav_params['quadrotor']
+    attitude = quad_prop['init_attitude_Q'] 
+    for i in range(0,len(attitude)):
+        attitude[i] = np.radians(attitude[i])
+    initq = rn.from_euler(attitude[0],attitude[1],attitude[2])    
 
     # Initialize anglular velocity of quadrotor
-    wx, wy, wz = float(uav_params['wx']), float(uav_params['wy']), float(uav_params['wz'])
-    initAngVel = np.array([wx,wy,wz])
+    initAngVel = np.array(quad_prop['init_angVel_Q'])
     
     initState  = np.zeros((19,))
     initState[0:3]   = initPosL
@@ -200,11 +199,10 @@ def main(filename, animateOrPlotdict, uav_params):
     # dt: time interval
     # initState: initial state
     # set it as 1 tick: i.e: 1 ms
-    # loadF: payload flag, 0: no payload, 1: payload 
-    loadF = float(uav_params['payload']) 
-    if loadF:
+    # lpoad: payload flag, enabled: with payload, otherwise: no payload 
+    pload = uav_params['payload']['mode']
+    if 'enabled' in pload:
         dt, initState = initializeStateWithPayload(uav_params)
-        plFullstate   = np.zeros((1,19))
     else:
         dt, initState = initializeState(uav_params)
     uav1 = uav.UavModel(dt, initState, uav_params)
@@ -226,6 +224,7 @@ def main(filename, animateOrPlotdict, uav_params):
     # note that the attitude controller will only compute a new output at 500 Hz
     # and the position controller only at 100 Hz
     # If you want an output always, simply select tick==0
+    plFullstate   = np.zeros((1,19))
     full_state = np.zeros((1, 13))
     ref_state  = np.zeros((1, 6))
     cont_stack = np.zeros((1, 8))
@@ -244,7 +243,7 @@ def main(filename, animateOrPlotdict, uav_params):
         cffirmware.controllerSJC(control, setpoint, sensors, state, tick)
         # states evolution
         control_inp =  np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
-        if loadF:
+        if 'enabled' in pload:
              uav1.PL_nextState(control_inp)
              plFullstate = np.concatenate((plFullstate, uav1.state.reshape(1,19)))
         else:
@@ -255,7 +254,7 @@ def main(filename, animateOrPlotdict, uav_params):
         cont_stack = np.concatenate((cont_stack, contr_inps.reshape(1,8)))       
         full_state = np.concatenate((full_state, fullState.reshape(1,13)))
  # Cursor up one line
-    if loadF:
+    if 'enabled' in pload:
         plFullstate = np.delete(plFullstate, 0, 0)
     full_state = np.delete(full_state, 0, 0)
     ref_state  = np.delete(ref_state, 0, 0)

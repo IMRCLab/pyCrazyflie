@@ -16,27 +16,31 @@ class UavModel:
                0.830806 16.655602 1.800197    -----------------> Moment of Inertia 
                0.718277 1.800197 29.261652)*10^-6 [kg.m^2]"""
 
-        def __init__(self,dt ,state, uav_dy):
-            self.m      = float(uav_dy['m'])
-            self.I      = np.array([[float(uav_dy['Ixx']),0,0],[0,float(uav_dy['Iyy']),0],[0,0,float(uav_dy['Izz'])]])
-            self.invI   = linalg.inv(self.I)
-            self.d      = float(uav_dy['d']) 
-            self.cft    = float(uav_dy['cft'])
-            self.all    = np.array([[1, 1, 1, 1],[0, -self.d, 0 , self.d],[self.d, 0 , -self.d, 0],[-self.cft, self.cft, -self.cft, self.cft]])
-            self.invAll = linalg.pinv(self.all)
-            self.grav   = np.array([0,0,-self.m*9.81])
-            self.pload  = float(uav_dy['payload']) 
+        def __init__(self,dt ,state, uav_params):
+            quad_prop     = uav_params['quadrotor'] # quadrotor properties dictionary from initialize.yaml file
+            payload_prop  = uav_params['payload'] # payload properties dictionary from initialize.yaml file
+            self.m        = float(quad_prop['m'])
+            self.I        = np.diag(quad_prop['I'])
+            self.invI     = linalg.inv(self.I)
+            self.d        = float(quad_prop['d']) 
+            self.cft      = float(quad_prop['cft'])
+            self.all      = np.array([[1, 1, 1, 1],[0, -self.d, 0 , self.d],[self.d, 0 , -self.d, 0],[-self.cft, self.cft, -self.cft, self.cft]])
+            self.invAll   = linalg.pinv(self.all)
+            self.grav     = np.array([0,0,-self.m*9.81])
+            self.loadMode = payload_prop['mode'] 
              ### State initialized with the Initial values ###
              ### state = [x, y, z, xdot, ydot, zdot, qw, qx, qy, qz, wx, wy, wz]
             self.state = state
-            if self.pload == 1:
-                self.mp    = float(uav_dy['m_p']) # Mass of payload [kg]
-                self.lc    = float(uav_dy['l_c'])  # length of cable [m]
+            if self.loadMode in 'enabled':
+                self.pload = True
+                self.mp    = float(payload_prop['m_p']) # Mass of payload [kg]
+                self.lc    = float(payload_prop['l_c'])  # length of cable [m]
                 self.mt    = self.m + self.mp # Total mass [kg]
-                self.grav_= np.array([0,0,-self.mt*9.81])
-
+                self.grav_ = np.array([0,0,-self.mt*9.81])
+            else:
+                self.pload = False
             self.dt    = dt
-            self.drag  = float((uav_dy['drag']))
+            self.drag  = float((quad_prop['drag']))
             if self.drag ==  1:
                 self.Kaero = np.diag([-9.1785e-7, -9.1785e-7, -10.311e-7]) 
                 
