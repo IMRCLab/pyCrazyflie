@@ -39,10 +39,9 @@ class UavModel:
             self.drag  = float((uav_dy['drag']))
             if self.drag ==  1:
                 self.Kaero = np.diag([-9.1785e-7, -9.1785e-7, -10.311e-7]) 
-                print(self.Kaero)
-
+                
         def __str__(self):
-          return "\nUAV object with physical parameters defined as follows: \n \n m = {} kg,\n \n{} {}\n I = {}{} [kg.m^2] \n {}{}\n\n Initial State = {}".format(self.m,'     ',self.I[0,:],' ',self.I[1,:],'     ',self.I[2,:], self.state)
+          return "\nUAV object with physical parameters defined as follows: \n \n m = {} kg, l_arm = {} \n \n{} {}\n I = {}{} [kg.m^2] \n {}{}\n\n Initial State = {}".format(self.m,self.d,'     ',self.I[0,:],' ',self.I[1,:],'     ',self.I[2,:], self.state)
           
         def getNextAngularState(self, curr_w, curr_q, tau):
            wdot  = self.invI @ (tau - skew(curr_w) @ self.I @ curr_w)

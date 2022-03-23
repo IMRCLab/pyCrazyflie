@@ -51,7 +51,7 @@ def updateDesState(setpoint, fulltraj):
     
 def updateSensor(sensors, uav):
     """This function updates the sensors signals"""
-    if len(uav.state) == 19:
+    if uav.pload:
         uavState = np.zeros((13,))
         posq = uav.state[0:3] - uav.lc * uav.state[6:9]
         pdot = np.cross(uav.state[9:12], uav.state[6:9])
@@ -70,7 +70,7 @@ def updateSensor(sensors, uav):
 
 def updateState(state, uav):
     uavState = np.zeros((13,))
-    if len(uav.state) == 19:
+    if uav.pload:
         posq = uav.state[0:3] - uav.lc * uav.state[6:9]
         # print(posq, uav.lc, uav.state[6:9])
         pdot = np.cross(uav.state[9:12], uav.state[6:9])
@@ -101,7 +101,7 @@ def updateState(state, uav):
     fullState = np.array([state.position.x,state.position.y,state.position.z, 
                           state.velocity.x,state.velocity.y, state.velocity.z, 
                           q_curr[0],q_curr[1],q_curr[2],q_curr[3], uavState[10],uavState[11],uavState[12]]).reshape((13,))
-    return state,fullState
+    return state, fullState
 
 def initializeState(uav_params):
     """This function sets the initial states of the UAV
@@ -172,13 +172,12 @@ def initializeStateWithPayload(uav_params):
     initState[16::]  = initAngVel
     return dt, initState
 
-
-def animateTrajectory(uavModel, full_state, ref_state, videoname):
+def animateTrajectory(uavModel, plFullstate, full_state, ref_state, videoname):
     # Animation    
     fig     = plt.figure(figsize=(10,10))
     ax      = fig.add_subplot(autoscale_on=True,projection="3d")
     sample  = 100
-    animate = animateSingleUav.PlotandAnimate(fig, ax, uavModel, full_state[::sample,:],ref_state[::sample,:]) 
+    animate = animateSingleUav.PlotandAnimate(fig, ax, uavModel, plFullstate[::sample, :], full_state[::sample,:],ref_state[::sample,:]) 
     dt_sampled = uavModel.dt * sample
     print("Converting Animation to Video. \nPlease wait...")
     now = time.time()
@@ -187,13 +186,13 @@ def animateTrajectory(uavModel, full_state, ref_state, videoname):
     plt.close(fig)
     print("Run time:  {:.3f}s".format((end - now)))
 
-def animateOrPlot(uavModel, full_state, ref_state, cont_stack, animateOrPlotdict, videoname, pdfName, tf_sim): 
+def animateOrPlot(uavModel, plFullstate, full_state, ref_state, cont_stack, animateOrPlotdict, videoname, pdfName, tf_sim): 
     if animateOrPlotdict['animate'] and animateOrPlotdict['savePlot']:
-        animateTrajectory(uavModel , full_state, ref_state, videoname)
+        animateTrajectory(uavModel, plFullstate, full_state, ref_state, videoname)
         animateSingleUav.outputPlots(ref_state, full_state, cont_stack, animateOrPlotdict['savePlot'], tf_sim, pdfName)     
     elif animateOrPlotdict['animate']:
-        animateTrajectory(uavModel , full_state, ref_state, videoname)
-        print('Animation')
+        animateTrajectory(uavModel, plFullstate, full_state, ref_state, videoname)
+        animateSingleUav.outputPlots(ref_state, full_state, cont_stack, animateOrPlotdict['savePlot'], tf_sim, pdfName) 
     else:
         # The plot will be shown eitherways
         # savePlot: saves plot in pdf format
@@ -210,6 +209,7 @@ def main(filename, animateOrPlotdict, uav_params):
     loadF = float(uav_params['payload']) 
     if loadF:
         dt, initState = initializeStateWithPayload(uav_params)
+        plFullstate   = np.zeros((1,19))
     else:
         dt, initState = initializeState(uav_params)
     uav1 = uav.UavModel(dt, initState, uav_params)
@@ -223,7 +223,7 @@ def main(filename, animateOrPlotdict, uav_params):
     print('\n Total trajectory time: '+str(tf_ms*1e-3)+ 's')
     print('Simulating...')
     # Simulation time
-    tf_sim = tf_ms + 3e3
+    tf_sim = tf_ms + 10e3
     #initialize the controller and allocate current state (both sensor and state are the state)
     # This is kind of odd and should be part of state
     control, setpoint, sensors, state = initController()
@@ -250,7 +250,8 @@ def main(filename, animateOrPlotdict, uav_params):
         # states evolution
         control_inp =  np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
         if loadF:
-         uav1.PL_nextState(control_inp)
+             uav1.PL_nextState(control_inp)
+             plFullstate = np.concatenate((plFullstate, uav1.state.reshape(1,19)))
         else:
             uav1.states_evolution(control_inp)
         # stack control inputs and full states for plotting and animating
@@ -259,6 +260,8 @@ def main(filename, animateOrPlotdict, uav_params):
         cont_stack = np.concatenate((cont_stack, contr_inps.reshape(1,8)))       
         full_state = np.concatenate((full_state, fullState.reshape(1,13)))
  # Cursor up one line
+    if loadF:
+        plFullstate = np.delete(plFullstate, 0, 0)
     full_state = np.delete(full_state, 0, 0)
     ref_state  = np.delete(ref_state, 0, 0)
     cont_stack = np.delete(cont_stack, 0, 0)
@@ -267,8 +270,9 @@ def main(filename, animateOrPlotdict, uav_params):
     filename  = filename.replace('.csv', '')
     videoname = filename   +'.gif'
     pdfName   = filename   +'.pdf'
-    animateOrPlot(uav1, full_state, ref_state, cont_stack, animateOrPlotdict, videoname, pdfName, tf_sim)    
-       
+
+    animateOrPlot(uav1, plFullstate, full_state, ref_state, cont_stack, animateOrPlotdict, videoname, pdfName, tf_sim)    
+
 
 if __name__ == '__main__':
     try: 

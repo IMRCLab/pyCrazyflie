@@ -7,13 +7,13 @@ d: 4e-3
 cft: 0.005964552 
 drag: 0 # 0: do not include drag model, 1: include simple drag model
 ## Payload Properties
-payload: 0 # Payload flag, 0: no payload, 1: payload
+payload: 1 # Payload flag, 0: no payload, 1: payload
 m_p: 0.01 # Mass payload [kg]
-l_c: 0.7  # Length of cable [m]
+l_c: 1 # Length of cable [m]
 ## INITIAL CONDITIONS FOR PAYLOAD
-xl  :  0
+xl  :  1.5
 yl  :  0
-zl  :  0
+zl  :  -1
 vxl :  0
 vyl :  0
 vzl :  0
@@ -25,7 +25,7 @@ wyl :  0 # Angular velocity of payload
 wzl :  0
 
 ## INITIAL CONDITIONS for UAV
-x     : 0
+x     : 1.5
 y     : 0
 z     : 0.7
 roll  : 0
