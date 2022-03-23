@@ -187,16 +187,11 @@ def animateTrajectory(uavModel, plFullstate, full_state, ref_state, videoname):
     print("Run time:  {:.3f}s".format((end - now)))
 
 def animateOrPlot(uavModel, plFullstate, full_state, ref_state, cont_stack, animateOrPlotdict, videoname, pdfName, tf_sim): 
-    if animateOrPlotdict['animate'] and animateOrPlotdict['savePlot']:
-        animateTrajectory(uavModel, plFullstate, full_state, ref_state, videoname)
-        animateSingleUav.outputPlots(ref_state, full_state, cont_stack, animateOrPlotdict['savePlot'], tf_sim, pdfName)     
-    elif animateOrPlotdict['animate']:
-        animateTrajectory(uavModel, plFullstate, full_state, ref_state, videoname)
-        animateSingleUav.outputPlots(ref_state, full_state, cont_stack, animateOrPlotdict['savePlot'], tf_sim, pdfName) 
-    else:
-        # The plot will be shown eitherways
-        # savePlot: saves plot in pdf format
-        animateSingleUav.outputPlots(ref_state, full_state, cont_stack, animateOrPlotdict['savePlot'], tf_sim, pdfName)
+    if animateOrPlotdict['animate']:
+        animateTrajectory(uavModel, plFullstate, full_state, ref_state, videoname)     
+    # The plot will be shown eitherways
+    # savePlot: saves plot in pdf format
+    animateSingleUav.outputPlots(ref_state, full_state, cont_stack, animateOrPlotdict['savePlot'], tf_sim, pdfName)
    
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##        
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##
@@ -220,7 +215,7 @@ def main(filename, animateOrPlotdict, uav_params):
     timeStamped_traj = np.loadtxt(filename, delimiter=',')   
     # final time of traj in ms
     tf_ms = timeStamped_traj[0,-1]*1e3
-    print('\n Total trajectory time: '+str(tf_ms*1e-3)+ 's')
+    print('\nTotal trajectory time: '+str(tf_ms*1e-3)+ 's')
     print('Simulating...')
     # Simulation time
     tf_sim = tf_ms + 10e3
