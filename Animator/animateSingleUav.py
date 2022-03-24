@@ -41,7 +41,7 @@ def setlimits(ax, full_state):
     ax.set_zlabel('Z')
     return ax
 
-def outputPlots(ref_state, full_state, cont_stack, savePlot, tf_sim, pdfName):
+def outputPlots(ref_state, plFullstate, full_state, cont_stack, savePlot, tf_sim, pdfName):
     print('Plotting...')
     plt.rcParams['axes.grid'] = True
     
