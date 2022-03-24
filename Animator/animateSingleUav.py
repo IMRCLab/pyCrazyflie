@@ -41,7 +41,71 @@ def setlimits(ax, full_state):
     ax.set_zlabel('Z')
     return ax
 
-def outputPlots(ref_state, plFullstate, full_state, cont_stack, savePlot, tf_sim, pdfName):
+def plotPayloadStates(full_state, tf_sim):
+    """This function plots the states of the payload"""
+    # PL_states = [xl, vl, p, wl]
+    fig8, ax11 = plt.subplots(3, 1, sharex=True ,sharey=True)
+    fig8.tight_layout()
+    
+    fig9, ax12 = plt.subplots(3, 1, sharex=True, sharey=True)
+    fig9.tight_layout()
+
+    fig10, ax13 = plt.subplots(3, 1, sharex=True ,sharey=True)
+    fig10.tight_layout()
+
+    fig11, ax14 = plt.subplots(3, 1, sharex=True ,sharey=True)
+    fig11.tight_layout()
+
+    time   = np.linspace(0, tf_sim*1e-3, num=len(full_state)) 
+    pos    = full_state[:,0:3]
+    linVel = full_state[:,3:6]
+    angVel = full_state[:,9:12]
+    p      = full_state[:,6:9]
+    ts = 'time [s]'
+###############################################################################################
+   
+    ax11[0].plot(time, pos[:,0], c='k', lw=0.75, label='Actual'), ax11[1].plot(time, pos[:,1], lw=0.75, c='k'), ax11[2].plot(time, pos[:,2], lw=0.75, c='k')
+    ax11[0].set_ylabel('x [m]',), ax11[1].set_ylabel('y [m]'), ax11[2].set_ylabel('z [m]')
+    ax11[0].legend()
+    fig8.supxlabel(ts,fontsize='small')
+
+    grid = plt.GridSpec(3,1)
+    create_subtitle(fig8, grid[0, ::], 'Actual Payload Positions')
+###############################################################################################
+
+   
+    ax12[0].plot(time, linVel[:,0],lw=0.75, c='k', label='Actual'), ax12[1].plot(time, linVel[:,1],lw=0.75, c='k'), ax12[2].plot(time, linVel[:,2],lw=0.75, c='k')
+    ax12[0].set_ylabel('vx [m/s]'), ax12[1].set_ylabel('vy [m/s]'), ax12[2].set_ylabel('vz [m/s]')
+    ax12[0].legend()
+    fig9.supxlabel(ts,fontsize='small')
+
+    grid = plt.GridSpec(3,1)
+    create_subtitle(fig9, grid[0, ::], 'Actual Payload Linear Velocities')
+
+###############################################################################################
+
+    ax13[0].plot(time, angVel[:,0],c='k',lw=1, label='Actual'),  ax13[1].plot(time, angVel[:,1],c='k',lw=1), ax13[2].plot(time, angVel[:,2],c='k',lw=1)
+    ax13[0].set_ylabel('wx [deg/s]',labelpad=-5), ax13[1].set_ylabel('wy [deg/s]',labelpad=-5), ax13[2].set_ylabel('wz [deg/s]',labelpad=-5)
+    fig10.supxlabel(ts,fontsize='small')
+
+    grid = plt.GridSpec(3,1)
+    create_subtitle(fig10, grid[0, ::], ' Actual Payload Angular Velocities')
+
+###############################################################################################
+    
+    ax14[0].plot(time, p[:,0],c='k',lw=1, label='Actual'), ax14[1].plot(time, p[:,1],c='k',lw=1), ax14[2].plot(time, p[:,2],c='k',lw=1)
+    ax14[0].set_ylabel('px',labelpad=-5), ax14[1].set_ylabel('py',labelpad=-5), ax14[2].set_ylabel('pz',labelpad=-5)
+    fig11.supxlabel(ts,fontsize='small')
+
+    grid = plt.GridSpec(3,1)
+    create_subtitle(fig11, grid[0, ::], 'Cable Directional Unit Vector')
+
+    return fig8, fig9, fig10, fig11
+
+
+
+###############################################################################################
+def outputPlots(uavModel, plFullstate, ref_state, full_state, cont_stack, savePlot, tf_sim, pdfName):
     print('Plotting...')
     plt.rcParams['axes.grid'] = True
     
@@ -159,6 +223,8 @@ def outputPlots(ref_state, plFullstate, full_state, cont_stack, savePlot, tf_sim
     ax10.legend()
     ax10 = setlimits(ax10, pos)
 
+    if uavModel.pload :
+        fig8, fig9, fig10, fig11 = plotPayloadStates(plFullstate, tf_sim)
     if savePlot:
         with PdfPages(pdfName) as pdf:
             fig1.savefig(pdf, format='pdf', bbox_inches='tight')
@@ -168,6 +234,10 @@ def outputPlots(ref_state, plFullstate, full_state, cont_stack, savePlot, tf_sim
             fig5.savefig(pdf, format='pdf', bbox_inches='tight')  
             fig6.savefig(pdf, format='pdf', bbox_inches='tight')
             fig7.savefig(pdf, format='pdf', bbox_inches='tight')
+            fig8.savefig(pdf, format='pdf', bbox_inches='tight')
+            fig9.savefig(pdf, format='pdf', bbox_inches='tight')
+            fig10.savefig(pdf, format='pdf', bbox_inches='tight')
+            fig11.savefig(pdf, format='pdf', bbox_inches='tight')
     plt.show()
 
 

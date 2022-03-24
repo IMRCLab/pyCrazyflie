@@ -2,7 +2,7 @@
 
 ## Payload Properties
 payload:  # Payload flag, 0: no payload, 1: payload
-  mode: "disabled"
+  mode: "enabled"
   m_p: 0.01 # Mass payload [kg]
   l_c: 1 # Length of cable [m]
   ## INITIAL CONDITIONS FOR PAYLOAD

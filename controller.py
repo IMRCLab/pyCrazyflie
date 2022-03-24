@@ -190,7 +190,7 @@ def animateOrPlot(uavModel, plFullstate, full_state, ref_state, cont_stack, anim
         animateTrajectory(uavModel, plFullstate, full_state, ref_state, videoname)     
     # The plot will be shown eitherways
     # savePlot: saves plot in pdf format
-    animateSingleUav.outputPlots(ref_state, plFullstate, full_state, cont_stack, animateOrPlotdict['savePlot'], tf_sim, pdfName)
+    animateSingleUav.outputPlots(uavModel, plFullstate, ref_state, full_state, cont_stack, animateOrPlotdict['savePlot'], tf_sim, pdfName)
    
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##        
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##
