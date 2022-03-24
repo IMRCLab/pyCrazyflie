@@ -15,20 +15,31 @@ def create_subtitle(fig: plt.Figure, grid: SubplotSpec, title: str):
     row.axis('off')
 
 def setlimits(ax, full_state):
-        edge  = 0.9
-        max_x = max(full_state[0,:])
-        max_y = max(full_state[1,:])
-        max_z = max(full_state[2,:])
-       
-        ax.set_xlim3d([-max_x-edge, max_x+edge])
-        ax.set_xlabel('X')
-        ax.set_ylim3d([-max_y-edge, max_y+edge])
-        ax.set_ylabel('Y')
-        ax.set_zlim3d([-max_z-edge, max_z+edge]) #
-        ax.set_zlabel('Z')
-        ax.legend()
-        ax.view_init(25,35)
-        return ax
+    # This method finds the maximum value in the x-y-z actual states and sets the limits of the figure accordingly   
+    # edge: adds extra space for the figure 
+    edge  = 0.9
+    max_x = max(full_state[:,0])
+    max_y = max(full_state[:,1])
+    max_z = max(full_state[:,2])
+    if (max_x >= max_y) and (max_x >= max_z):
+        max_ = max_x
+        ax.set_xlim3d([-max_-edge, max_+edge])
+        ax.set_ylim3d([-max_-edge, max_+edge])
+        ax.set_zlim3d([-max_-edge, max_+edge])
+    elif (max_y >= max_x) and (max_y >= max_z):
+        max_ = max_y
+        ax.set_xlim3d([-max_-edge, max_+edge])
+        ax.set_ylim3d([-max_-edge, max_+edge])
+        ax.set_zlim3d([-max_-edge, max_+edge])
+    else:
+        max_ = max_z
+        ax.set_xlim3d([-max_-edge, max_+edge])
+        ax.set_ylim3d([-max_-edge, max_+edge])
+        ax.set_zlim3d([-max_-edge, max_+edge])
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    return ax
 
 def outputPlots(ref_state, full_state, cont_stack, savePlot, tf_sim, pdfName):
     print('Plotting...')
@@ -76,13 +87,10 @@ def outputPlots(ref_state, full_state, cont_stack, savePlot, tf_sim, pdfName):
     ax1[0].plot(time, posdes[:,0], lw=0.75, c='darkgreen',label='Reference'), ax1[1].plot(time, posdes[:,1], lw=0.75, c='darkgreen'), ax1[2].plot(time, posdes[:,2], lw=0.75, c='darkgreen')
     ax1[0].set_ylabel('x [m]',), ax1[1].set_ylabel('y [m]'), ax1[2].set_ylabel('z [m]')
     ax1[0].legend()
-    # ax1[1,0].plot(time, posdes[:,0], lw=0.9), ax1[1,1].plot(time, posdes[:,1], lw=0.9), ax1[1,2].plot(time, posdes[:,2], lw=0.9)
-    # ax1[1,0].set_ylabel('x des [m]'), ax1[1,1].set_ylabel('y des [m]'), ax1[1,2].set_ylabel('z des [m]')
     fig1.supxlabel(ts,fontsize='small')
 
     grid = plt.GridSpec(3,1)
     create_subtitle(fig1, grid[0, ::], 'Actual vs Reference Positions')
-    # create_subtitle(fig1, grid[1, ::], 'Reference Positions')
 
     ###################################
       
@@ -90,13 +98,10 @@ def outputPlots(ref_state, full_state, cont_stack, savePlot, tf_sim, pdfName):
     ax2[0].plot(time, linVeldes[:,0],lw=0.75, c='darkgreen',label='Reference'), ax2[1].plot(time, linVeldes[:,1],lw=0.75, c='darkgreen'), ax2[2].plot(time, linVeldes[:,2],lw=0.75, c='darkgreen')
     ax2[0].set_ylabel('vx [m/s]'), ax2[1].set_ylabel('vy [m/s]'), ax2[2].set_ylabel('vz [m/s]')
     ax2[0].legend()
-    # ax2[1,0].plot(time, linVeldes[:,0], lw=0.9), ax2[1,1].plot(time, linVeldes[:,1], lw=0.9), ax2[1,2].plot(time, linVeldes[:,2], lw=0.9)
-    # ax2[1,0].set_ylabel('vx des [m/s]'), ax2[1,1].set_ylabel('vy des [m/s]'), ax2[1,2].set_ylabel('vz des [m/s]')
     fig2.supxlabel(ts,fontsize='small')
 
     grid = plt.GridSpec(3,1)
     create_subtitle(fig2, grid[0, ::], 'Actual vs Reference Linear Velocities')
-    # create_subtitle(fig2, grid[1, ::], 'Reference Linear Velocities')
 
     ###################################
 
@@ -151,6 +156,7 @@ def outputPlots(ref_state, full_state, cont_stack, savePlot, tf_sim, pdfName):
     ax10 = fig7.add_subplot(autoscale_on=True,projection="3d")
     ax10.plot3D(pos[:,0], pos[:,1], pos[:,2], 'k-.',lw=1.5, label="Actual Trajectory")
     ax10.plot3D(posdes[:,0], posdes[:,1] , posdes[:,2],'darkgreen',ls='--',lw=1.5,label="Reference Trajectory")
+    ax10.legend()
     ax10 = setlimits(ax10, pos)
 
     if savePlot:
@@ -184,11 +190,18 @@ def RotatedCylinder(center_x, center_y, radius, height_z, q):
             Zb[i,j] = rb[2]   
     return Xb, Yb, Zb
 
+def Sphere(Cx, Cy, Cz, r):
+    u, v = np.mgrid[0:2 * np.pi:30j, 0:np.pi:20j]
+    x = r*np.cos(u) * np.sin(v)
+    y = r*np.sin(u) * np.sin(v)
+    z = r*np.cos(v)
+    return x, y, z
 class PlotandAnimate:
-    def __init__(self, fig, ax, uavModel,full_state, reference_state): 
+    def __init__(self, fig, ax, uavModel, plFullstate, full_state, reference_state): 
         # Initialize the Actual and Reference states
         self.full_state      = full_state
         self.reference_state = reference_state
+        self.plFullstate     = plFullstate
         self.uavModel        = uavModel
         # Initialize a 3d figure
         self.fig = fig
@@ -215,16 +228,30 @@ class PlotandAnimate:
         self.ani.save('Videos/'+videoname)
 
     def setlimits(self):
-        edge  = 0.9
-        max_x = max(self.full_state[0,:])
-        max_y = max(self.full_state[1,:])
-        max_z = max(self.full_state[2,:])
+        # This method finds the maximum value in the x-y-z actual states and sets the limits of the figure accordingly   
+        # edge: adds extra space for the figure 
+        edge  = 0.5
+        max_x = max(self.full_state[:,0])
+        max_y = max(self.full_state[:,1])
+        max_z = max(self.full_state[:,2])
+        if (max_x >= max_y) and (max_x >= max_z):
+            max_ = max_x
+            self.ax.set_xlim3d([-max_-edge, max_+edge])
+            self.ax.set_ylim3d([-max_-edge, max_+edge])
+            self.ax.set_zlim3d([-max_-edge, max_+edge])
+        elif (max_y >= max_x) and (max_y >= max_z):
+            max_ = max_y
+            self.ax.set_xlim3d([-max_-edge, max_+edge])
+            self.ax.set_ylim3d([-max_-edge, max_+edge])
+            self.ax.set_zlim3d([-max_-edge, max_+edge])
+        else:
+            max_ = max_z
+            self.ax.set_xlim3d([-max_-edge, max_+edge])
+            self.ax.set_ylim3d([-max_-edge, max_+edge])
+            self.ax.set_zlim3d([-max_-edge, max_+edge])
        
-        self.ax.set_xlim3d([-max_x-edge, max_x+edge])
         self.ax.set_xlabel('X')
-        self.ax.set_ylim3d([-max_y-edge, max_y+edge])
         self.ax.set_ylabel('Y')
-        self.ax.set_zlim3d([-max_z-edge, max_z+edge]) #
         self.ax.set_zlabel('Z')
 
     def drawQuivers(self, x, y, z, q, xref, yref, zref):
@@ -283,6 +310,21 @@ class PlotandAnimate:
         self.ax.plot_surface(Xb+armI2[0], Yb+armI2[1], Zb+armI2[2], alpha=1)
         self.ax.plot_surface(Xb+_armI2[0], Yb+_armI2[1], Zb+_armI2[2], alpha=1)
 
+    def getPayloadStates(self,i):
+        xl = self.plFullstate[:i+1,0]
+        yl = self.plFullstate[:i+1,1]
+        zl = self.plFullstate[:i+1,2]
+        return xl, yl, zl
+
+    def drawPlTraj(self, xl,yl,zl):
+        self.ax.plot3D(xl, yl, zl, 'darkblue',linestyle='-.',lw=1.5,label="Payload Trajectory")
+        self.ax.legend()
+
+    def drawPayload(self,x,y,z,xl,yl,zl):
+        c_st = np.array([x,y,z])
+        c_en = np.array([xl,yl,zl])
+        self.ax.plot3D(np.linspace(c_st[0], c_en[0]), np.linspace(c_st[1], c_en[1]), np.linspace(c_st[2], c_en[2]), 'darkblue',lw=2)
+
     def animate(self,i):
         self.ax.cla()
         self.setlimits()
@@ -290,6 +332,13 @@ class PlotandAnimate:
         xref,yref,zref               = self.getRefState(i) 
         armI1, armI2, _armI1, _armI2 = self.getArmpos(x[i],y[i],z[i],q)
 
+        if self.uavModel.pload:
+            xl, yl, zl  = self.getPayloadStates(i)
+            self.drawPayload(x[i], y[i], z[i], xl[i], yl[i], zl[i])
+            self.drawPlTraj(xl, yl, zl)
+            r = 1e-1
+            xsp, ysp, zsp = Sphere(xl, yl, zl, r)
+            self.ax.plot_surface(xl[i]+xsp, yl[i]+ysp, zl[i]+zsp, cmap=plt.cm.YlGnBu_r)
         self.drawQuivers(x[i],y[i],z[i], q, xref[i], yref[i], zref[i])
         self.drawActvsRefTraj(x, y, z, xref, yref, zref)
         self.drawQuadrotorArms(x[i], y[i], z[i], armI1, armI2, _armI1, _armI2)
