@@ -3,10 +3,10 @@
 ## Payload Properties
 payload:  # Payload flag, 0: no payload, 1: payload
   mode: "enabled"
-  m_p: 0.01 # Mass payload [kg]
+  m_p: 0.001 # Mass payload [kg]
   l_c: 1 # Length of cable [m]
   ## INITIAL CONDITIONS FOR PAYLOAD
-  init_pos_L  :  [0,   0, -0.3]
+  init_pos_L  :  [0,   0, -1]
   init_linV_L :  [0,   0,  0]
   p           :  [0,   0, -1] # Initial condition for directional unit vector from UAV to payload
                                                 # p = [0,0,-1]

@@ -41,7 +41,7 @@ def setlimits(ax, full_state):
     ax.set_zlabel('Z')
     return ax
 
-def plotPayloadStates(full_state, tf_sim):
+def plotPayloadStates(full_state, posq, tf_sim):
     """This function plots the states of the payload"""
     # PL_states = [xl, vl, p, wl]
     fig8, ax11 = plt.subplots(3, 1, sharex=True ,sharey=True)
@@ -55,6 +55,10 @@ def plotPayloadStates(full_state, tf_sim):
 
     fig11, ax14 = plt.subplots(3, 1, sharex=True ,sharey=True)
     fig11.tight_layout()
+    
+    fig12, ax15 = plt.subplots(1, 1, sharex=True ,sharey=True)
+    fig12.tight_layout()
+    
 
     time   = np.linspace(0, tf_sim*1e-3, num=len(full_state)) 
     pos    = full_state[:,0:3]
@@ -100,7 +104,19 @@ def plotPayloadStates(full_state, tf_sim):
     grid = plt.GridSpec(3,1)
     create_subtitle(fig11, grid[0, ::], 'Cable Directional Unit Vector')
 
-    return fig8, fig9, fig10, fig11
+###############################################################################################
+    norm_x = np.zeros((len(full_state),))
+    for i in range(0, len(norm_x)):
+        norm_x[i] = np.linalg.norm(pos[i,:] - posq[i,:])
+
+    ax15.plot(time, norm_x,c='k',lw=1, label='Norm')
+    ax15.set_ylabel('||xq - xp||',labelpad=-5)    
+    fig12.supxlabel(ts,fontsize='small')
+
+    grid = plt.GridSpec(3,1)
+    create_subtitle(fig12, grid[0, ::], 'Diff between Quadrotor and Payload Positions (Norm)')
+
+    return fig8, fig9, fig10, fig11, fig12
 
 
 
@@ -215,7 +231,6 @@ def outputPlots(uavModel, plFullstate, ref_state, full_state, cont_stack, savePl
     create_subtitle(fig6, grid[0,::], 'Motor Forces')
     ###################################
 
-
     fig7 = plt.figure(figsize=(10,10))
     ax10 = fig7.add_subplot(autoscale_on=True,projection="3d")
     ax10.plot3D(pos[:,0], pos[:,1], pos[:,2], 'k-.',lw=1.5, label="Actual Trajectory")
@@ -223,8 +238,8 @@ def outputPlots(uavModel, plFullstate, ref_state, full_state, cont_stack, savePl
     ax10.legend()
     ax10 = setlimits(ax10, pos)
 
-    if uavModel.pload :
-        fig8, fig9, fig10, fig11 = plotPayloadStates(plFullstate, tf_sim)
+    if uavModel.pload:
+        fig8, fig9, fig10, fig11, fig12 = plotPayloadStates(plFullstate, pos, tf_sim)
     if savePlot:
         with PdfPages(pdfName) as pdf:
             fig1.savefig(pdf, format='pdf', bbox_inches='tight')
@@ -234,10 +249,12 @@ def outputPlots(uavModel, plFullstate, ref_state, full_state, cont_stack, savePl
             fig5.savefig(pdf, format='pdf', bbox_inches='tight')  
             fig6.savefig(pdf, format='pdf', bbox_inches='tight')
             fig7.savefig(pdf, format='pdf', bbox_inches='tight')
-            fig8.savefig(pdf, format='pdf', bbox_inches='tight')
-            fig9.savefig(pdf, format='pdf', bbox_inches='tight')
-            fig10.savefig(pdf, format='pdf', bbox_inches='tight')
-            fig11.savefig(pdf, format='pdf', bbox_inches='tight')
+            if uavModel.pload:
+                fig8.savefig(pdf, format='pdf', bbox_inches='tight')
+                fig9.savefig(pdf, format='pdf', bbox_inches='tight')
+                fig10.savefig(pdf, format='pdf', bbox_inches='tight')
+                fig11.savefig(pdf, format='pdf', bbox_inches='tight')
+                fig12.savefig(pdf, format='pdf', bbox_inches='tight')
     plt.show()
 
 
@@ -266,6 +283,8 @@ def Sphere(Cx, Cy, Cz, r):
     y = r*np.sin(u) * np.sin(v)
     z = r*np.cos(v)
     return x, y, z
+
+    
 class PlotandAnimate:
     def __init__(self, fig, ax, uavModel, plFullstate, full_state, reference_state): 
         # Initialize the Actual and Reference states
@@ -300,10 +319,10 @@ class PlotandAnimate:
     def setlimits(self):
         # This method finds the maximum value in the x-y-z actual states and sets the limits of the figure accordingly   
         # edge: adds extra space for the figure 
-        edge  = 0.5
-        max_x = max(self.full_state[:,0])
-        max_y = max(self.full_state[:,1])
-        max_z = max(self.full_state[:,2])
+        edge  = 0.1
+        max_x = max(self.reference_state[:,0])
+        max_y = max(self.reference_state[:,1])
+        max_z = max(self.reference_state[:,2])
         if (max_x >= max_y) and (max_x >= max_z):
             max_ = max_x
             self.ax.set_xlim3d([-max_-edge, max_+edge])

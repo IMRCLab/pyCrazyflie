@@ -51,17 +51,17 @@ def updateDesState(setpoint, fulltraj):
     
 def updateSensor(sensors, uav):
     """This function updates the sensors signals"""
-    if uav.pload:
-        uavState = np.zeros((13,))
-        posq = uav.state[0:3] - uav.lc * uav.state[6:9]
-        pdot = np.cross(uav.state[9:12], uav.state[6:9])
-        velq = uav.state[3:6] - uav.lc * pdot
-        uavState[0:3]  = posq
-        uavState[3:6]  = velq
-        uavState[6:10] = uav.state[12:16]
-        uavState[10::] =  uav.state[16::]
-    else:
-        uavState = uav.state
+    # if uav.pload:
+    #     uavState = np.zeros((13,))
+    #     posq = uav.state[0:3] - uav.lc * uav.state[6:9]
+    #     pdot = np.cross(uav.state[9:12], uav.state[6:9])
+    #     velq = uav.state[3:6] - uav.lc * pdot
+    #     uavState[0:3]  = posq
+    #     uavState[3:6]  = velq
+    #     uavState[6:10] = uav.state[12:16]
+    #     uavState[10::] =  uav.state[16::]
+    # else:
+    uavState = uav.state
     sensors.gyro.x = np.degrees(uavState[10]) # deg/s
     sensors.gyro.y = np.degrees(uavState[11]) # deg/s
     sensors.gyro.z = np.degrees(uavState[12]) # deg/s
@@ -69,18 +69,18 @@ def updateSensor(sensors, uav):
 
 
 def updateState(state, uav):
-    uavState = np.zeros((13,))
-    if uav.pload:
-        posq = uav.state[0:3] - uav.lc * uav.state[6:9]
-        # print(posq, uav.lc, uav.state[6:9])
-        pdot = np.cross(uav.state[9:12], uav.state[6:9])
-        velq = uav.state[3:6] - uav.lc * pdot
-        uavState[0:3]  = posq
-        uavState[3:6]  = velq
-        uavState[6:10] = uav.state[12:16]
-        uavState[10::] =  uav.state[16::]
-    else:
-        uavState = uav.state
+    # uavState = np.zeros((13,))
+    # if uav.pload:
+    #     posq = uav.state[0:3] - uav.lc * uav.state[6:9]
+    #     # print(posq, uav.lc, uav.state[6:9])
+    #     pdot = np.cross(uav.state[9:12], uav.state[6:9])
+    #     velq = uav.state[3:6] - uav.lc * pdot
+    #     uavState[0:3]  = posq
+    #     uavState[3:6]  = velq
+    #     uavState[6:10] = uav.state[12:16]
+    #     uavState[10::] =  uav.state[16::]
+    # else:
+    uavState = uav.state
 
     """This function passes the current states to the controller"""
     state.position.x = uavState[0]   # m
@@ -171,6 +171,19 @@ def initializeStateWithPayload(uav_params):
     initState[16::]  = initAngVel
     return dt, initState
 
+def StQuadfromPL(payload):
+    """This function initializes the states of the quadrotor given the states of the payload """ 
+    uavState =  np.zeros((13,))
+    posq = payload.state[0:3] - payload.lc * payload.state[6:9]
+    # print(posq, uav.lc, uav.state[6:9])
+    pdot = np.cross(payload.state[9:12], payload.state[6:9])
+    velq = payload.state[3:6] - payload.lc * pdot
+    uavState[0:3]  = posq
+    uavState[3:6]  = velq
+    uavState[6:10] = payload.state[12:16]
+    uavState[10::] =  payload.state[16::]
+    return uavState
+
 def animateTrajectory(uavModel, plFullstate, full_state, ref_state, videoname):
     # Animation    
     fig     = plt.figure(figsize=(10,10))
@@ -203,10 +216,16 @@ def main(filename, animateOrPlotdict, uav_params):
     pload = uav_params['payload']['mode']
     if 'enabled' in pload:
         dt, initState = initializeStateWithPayload(uav_params)
+        payload       = uav.Payload(dt, initState, uav_params)
+        uav1          = uav.UavModel(dt, StQuadfromPL(payload), uav_params, pload=True, lc=payload.lc)
+        print(uav1)
+        print()
+        print(payload)
     else:
         dt, initState = initializeState(uav_params)
-    uav1 = uav.UavModel(dt, initState, uav_params)
-    print(uav1)
+        uav1          = uav.UavModel(dt, initState, uav_params)
+        print(uav1)
+
     # Upload the traj in csv file format
     # rows: time, xdes, ydes, zdes, vxdes, vydes, vzdes, axdes, aydes, azdes
     # timeStamped_traj = np.genfromtxt(filename, delimiter=',')
@@ -243,9 +262,11 @@ def main(filename, animateOrPlotdict, uav_params):
         cffirmware.controllerSJC(control, setpoint, sensors, state, tick)
         # states evolution
         control_inp =  np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
+
         if 'enabled' in pload:
-             uav1.PL_nextState(control_inp)
-             plFullstate = np.concatenate((plFullstate, uav1.state.reshape(1,19)))
+            payload.PL_nextState(control_inp, uav1)
+            uav1.state = StQuadfromPL(payload)
+            plFullstate = np.concatenate((plFullstate, payload.state.reshape(1,19)))
         else:
             uav1.states_evolution(control_inp)
         # stack control inputs and full states for plotting and animating
