@@ -15,10 +15,9 @@ def skew(w):
 
 class Payload:
     def __init__(self, dt, state, uav_params):
-        payload_prop = uav_params['payload'] # payload properties dictionary from initialize.yaml file
-        self.mp      = float(payload_prop['m_p']) # Mass of payload [kg]
-        self.lc      = float(payload_prop['l_c'])  # length of cable [m]
-        self.m       = float(uav_params['quadrotor']['m']) # Mass of quadrotor [kg]
+        self.mp      = float(uav_params['m_p']) # Mass of payload [kg]
+        self.lc      = float(uav_params['l_c'])  # length of cable [m]
+        self.m       = float(uav_params['m']) # Mass of quadrotor [kg]
         self.mt      = self.m + self.mp # Total mass [kg]
         self.grav_   = np.array([0,0,-self.mt*9.81])
         # state = [xl, yl, zl, xldot, yldot, zldot, px, py, pz, wlx, wly, wlz, qw, qx, qy, qz, wx, wy, wz]
@@ -39,7 +38,7 @@ class Payload:
 
     def getPLAngularState(self, fz, curr_q, curr_p, curr_wl):
         R_IB = to_matrix(curr_q)
-        wld  = (1/(self.lc*self.m)) * ( skew(-curr_p) @ R_IB @ np.array([0,0,fz]) )
+        wld  = (1/(self.lc*self.m)) * ( skew(-curr_p) @ R_IB @ np.array([0,0,fz]))
         wl_  = wld * self.dt + curr_wl
         pd    =  skew(curr_wl) @ curr_p
         p_    = pd*self.dt + curr_p
@@ -80,12 +79,11 @@ class UavModel:
             0.718277 1.800197 29.261652)*10^-6 [kg.m^2]"""
 
     def __init__(self, dt, state, uav_params, pload=False, lc=0):
-        quad_prop     = uav_params['quadrotor'] # quadrotor properties dictionary from initialize.yaml file
-        self.m        = float(quad_prop['m'])
-        self.I        = np.diag(quad_prop['I'])
+        self.m        = float(uav_params['m'])
+        self.I        = np.diag(uav_params['I'])
         self.invI     = linalg.inv(self.I)
-        self.d        = float(quad_prop['d']) 
-        self.cft      = float(quad_prop['cft'])
+        self.d        = float(uav_params['d']) 
+        self.cft      = float(uav_params['cft'])
         self.all      = np.array([[1, 1, 1, 1],[0, -self.d, 0 , self.d],[self.d, 0 , -self.d, 0],[-self.cft, self.cft, -self.cft, self.cft]])
         self.invAll   = linalg.pinv(self.all)
         self.grav     = np.array([0,0,-self.m*9.81])
@@ -96,7 +94,7 @@ class UavModel:
         self.state = state
         self.dt    = dt
 
-        self.drag  = float((quad_prop['drag']))
+        self.drag  = float((uav_params['drag']))
         if self.drag ==  1:
             self.Kaero = np.diag([-9.1785e-7, -9.1785e-7, -10.311e-7]) 
             
