@@ -160,12 +160,12 @@ def StQuadfromPL(payload):
     uavState[10::] =  payload.state[16::]
     return uavState
 
-def animateTrajectory(uavs, ids, plFullstates, full_states, ref_states, videoname):
+def animateTrajectory(uavs, payloads, videoname):
     # Animation    
     fig     = plt.figure(figsize=(10,10))
     ax      = fig.add_subplot(autoscale_on=True,projection="3d")
     sample  = 100 
-    animate = animateSingleUav.PlotandAnimate(fig, ax, uavs, ids, plFullstates, full_states, ref_states, sample) 
+    animate = animateSingleUav.PlotandAnimate(fig, ax, uavs, payloads, sample) 
     dt_sampled = list(uavs.values())[0].dt * sample
     print("Starting Animation... \nAnimating, Please wait...")
     now = time.time()
@@ -176,14 +176,14 @@ def animateTrajectory(uavs, ids, plFullstates, full_states, ref_states, videonam
     plt.close(fig)
     print("Run time:  {:.3f}s".format((end - now)))
 
-def animateOrPlot(uavs, ids, plFullstates, full_states, ref_states, cont_stacks, animateOrPlotdict, filename, tf_sim): 
+def animateOrPlot(uavs, payloads, animateOrPlotdict, filename, tf_sim): 
     if animateOrPlotdict['animate']:
         videoname = filename + '.gif'
-        animateTrajectory(uavs, ids, plFullstates, full_states, ref_states, videoname)     
+        animateTrajectory(uavs, payloads, videoname)     
     # The plot will be shown eitherways
     # savePlot: saves plot in pdf format
     pdfName = filename + '.pdf'
-    animateSingleUav.outputPlots(uavs, ids, plFullstates, ref_states, full_states, cont_stacks, animateOrPlotdict['savePlot'], tf_sim, pdfName)
+    animateSingleUav.outputPlots(uavs, payloads, animateOrPlotdict['savePlot'], tf_sim, pdfName)
 
 
 def setParams(params):
@@ -191,10 +191,8 @@ def setParams(params):
     uavs         = {}
     payloads     = {}
     trajectories = {}
-    ids = []
     # print(params['Robots'])
     for name, robot in params['Robots'].items():
-        ids.append(name)
         trajectories['uav_'+name]   = robot['refTrajPath']
         if robot['payload']['mode'] in 'enabled':
             payload_params          = {**robot['payload'], **robot['initConditions'], 'm':robot['m'], 'dt':dt}
@@ -202,13 +200,13 @@ def setParams(params):
             payload                 = uav.Payload(dt, initState, payload_params)
             uav1                    = uav.UavModel(dt, StQuadfromPL(payload), robot, pload=True, lc=payload.lc)
             uavs['uav_'+name]       = uav1
-            payloads['pload_'+name] = payload
+            payloads['uav_'+name] = payload
         else:
             uav_params     = {'dt': dt, **robot['initConditions'], **robot}
             dt, initState  = initializeState(uav_params)
             uav1           = uav.UavModel(dt, initState, uav_params) 
             uavs['uav_'+name] = uav1
-    return ids, uavs, payloads, trajectories        
+    return uavs, payloads, trajectories        
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##        
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##
 def main(filename, animateOrPlotdict, params):
@@ -217,14 +215,14 @@ def main(filename, animateOrPlotdict, params):
     # initState: initial state
     # set it as 1 tick: i.e: 1 ms
     # lpoad: payload flag, enabled: with payload, otherwise: no payload 
-    ids, uavs, payloads, trajectories = setParams(params)
+    uavs, payloads, trajectories = setParams(params)
     # Upload the traj in csv file format
     # rows: time, xdes, ydes, zdes, vxdes, vydes, vzdes, axdes, aydes, azdes  
     timeStamped_traj = {}
-    for i in ids:
-        input = trajectories['uav_'+i]
-        timeStamped_traj['uav_'+i] = np.loadtxt(input, delimiter=',')
-        tf_ms = timeStamped_traj['uav_'+i][0,-1]*1e3
+    for id in uavs.keys():
+        input = trajectories[id]
+        timeStamped_traj[id] = np.loadtxt(input, delimiter=',')
+        tf_ms = timeStamped_traj[id][0,-1]*1e3
 
     # final time of traj in ms
 
@@ -232,66 +230,51 @@ def main(filename, animateOrPlotdict, params):
     print('Simulating...')
     # Simulation time
     tf_sim = tf_ms + 0.5e3
-    #initialize the controller and allocate current state (both sensor and state are the state)
-    # This is kind of odd and should be part of state
-    control, setpoint, sensors, state = initController()
-    # Note that 1 tick == 1ms
-    # note that the attitude controller will only compute a new output at 500 Hz
-    # and the position controller only at 100 Hz
-    # If you want an output always, simply select tick==0
-    plFullstates = {}
-    full_states  = {}
-    ref_states   = {}
-    cont_stacks  = {}
 
-    for i in ids:
-        uav1 = uavs['uav_'+i]
-        if uav1.pload:
-            payload = payloads['pload_'+i]
-        plFullstate   = np.zeros((1,19))
-        full_state = np.zeros((1, 13))
-        ref_state  = np.zeros((1, 6))
-        cont_stack = np.zeros((1, 8))    
+    for id, uav_ in uavs.items():
+        #initialize the controller and allocate current state (both sensor and state are the state)
+        # This is kind of odd and should be part of state
+        control, setpoint, sensors, state = initController()
+        # Note that 1 tick == 1ms
+        # note that the attitude controller will only compute a new output at 500 Hz
+        # and the position controller only at 100 Hz
+        # If you want an output always, simply select tick==0
+        if uav_.pload:
+            payload = payloads[id]
+         
         for tick in range(0, int(tf_sim)+1):
             # update desired state
             if tick <= int(tf_ms):    
-                setpoint  = updateDesState(setpoint, timeStamped_traj['uav_'+i][1::,tick])
-                ref_state = np.concatenate((ref_state, timeStamped_traj['uav_'+i][1:7,tick].reshape((1,6))))
+                setpoint  = updateDesState(setpoint, timeStamped_traj[id][1::,tick])
+                ref_state =  timeStamped_traj[id][1:7,tick]
             else:
-                setpoint  = updateDesState(setpoint, timeStamped_traj['uav_'+i][1::,-1])
-                ref_state = np.concatenate((ref_state, timeStamped_traj['uav_'+i][1:7,-1].reshape((1,6))))
+                setpoint  = updateDesState(setpoint, timeStamped_traj[id][1::,-1])
+                ref_state = timeStamped_traj[id][1:7,-1]
             # update current state
-            state,fullState = updateState(state, uav1)
-            sensors         = updateSensor(sensors, uav1)
+            state,fullState = updateState(state, uav_)
+            sensors         = updateSensor(sensors, uav_)
             # query the controller
             cffirmware.controllerSJC(control, setpoint, sensors, state, tick)
             # states evolution
             control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
 
-            if uav1.pload:
-                payload.PL_nextState(control_inp, uav1)
-                uav1.state = StQuadfromPL(payload)
-                plFullstate = np.concatenate((plFullstate, payload.state.reshape(1,19)))
+            if uav_.pload:
+                payload.PL_nextState(control_inp, uav_)
+                uav_.state = StQuadfromPL(payload)
             else:
-                uav1.states_evolution(control_inp)
-            # stack control inputs and full states for plotting and animating
-            u_mot = uav1.invAll @ control_inp
-            contr_inps = np.array([control_inp , u_mot]).reshape((1,8))
-            cont_stack = np.concatenate((cont_stack, contr_inps.reshape(1,8)))       
-            full_state = np.concatenate((full_state, fullState.reshape(1,13)))
-        plFullstates['uav_'+i] = plFullstate
-        full_states['uav_'+i]  = full_state
-        ref_states['uav_'+i]   = ref_state
-        cont_stacks['uav_'+i]  = cont_stack
+                uav_.states_evolution(control_inp)
+            uav_.stackStandCtrl(uav_.state, control_inp, ref_state)    
+        uav_.cursorUp()
+        uavs[id] = uav_
+        if uav_.pload:
+            payload.cursorUp()
+            payloads[id] = payload
+
  # Cursor up one line
-    for i in ids:
-        if uavs['uav_'+i].pload:
-            plFullstates['uav_'+i] = np.delete(plFullstates['uav_'+i], 0, 0)
-        full_states['uav_'+i] = np.delete(full_states['uav_'+i], 0, 0)
-        ref_states['uav_'+i]  = np.delete(ref_states['uav_'+i], 0, 0)
-        cont_stacks['uav_'+i] = np.delete(cont_stacks['uav_'+i], 0, 0)
+    # for id in uavs.keys():
+    #     ref_states[id]  = np.delete(ref_states[id], 0, 0)
     # Animation        
-    animateOrPlot(uavs, ids, plFullstates, full_states, ref_states, cont_stacks, animateOrPlotdict, filename, tf_sim)    
+    animateOrPlot(uavs, payloads, animateOrPlotdict, filename, tf_sim)    
 
 
 if __name__ == '__main__':

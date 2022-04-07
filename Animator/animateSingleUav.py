@@ -106,11 +106,12 @@ def plotPayloadStates(full_state, posq, tf_sim):
 
 ###############################################################################################
     norm_x = np.zeros((len(full_state),))
+
     for i in range(0, len(norm_x)):
         norm_x[i] = np.linalg.norm(pos[i,:] - posq[i,:])
 
     ax15.plot(time, norm_x,c='k',lw=1, label='Norm')
-    ax15.set_ylabel('||xq - xp||',labelpad=-5)    
+    ax15.set_ylabel('||xq - xp||',labelpad=-2)    
     fig12.supxlabel(ts,fontsize='small')
 
     grid = plt.GridSpec(3,1)
@@ -121,30 +122,24 @@ def plotPayloadStates(full_state, posq, tf_sim):
 
 
 ###############################################################################################
-def outputPlots(uavs, ids, plFullstates, ref_states, full_states, cont_stacks, savePlot, tf_sim, pdfName):
+def outputPlots(uavs, payloads, savePlot, tf_sim, pdfName):
     print('Plotting...')
     f = PdfPages(pdfName)
         # perform file operations
-    for i in ids:
-        # textfig = plt.figure()
-        # ax = textfig.add_subplot()
-        # ax.grid(False)
-        # ax.axis('off')
-        # textfig.grid(False)
-        txt = 'UAV_'+i
+    for id, uav_ in uavs.items():
+        txt = id
         textfig, textax = plt.subplots(figsize=(6, 6))
         textax.grid(False)
         textax.axis(False)
         textax.text(0.45, 0.45, txt, size=15, color='black')
-        # plt.text(4.5,1,txt, transform=textfig.transFigure, 
-        #  bbox={'facecolor':'white','alpha':1,'edgecolor':'none','pad':1},size=50, ha='left', va='top') 
-
-        uavModel        = uavs['uav_'+i]
-        full_state      = full_states['uav_'+i]
-        ref_state =  ref_states['uav_'+i]
-        plFullstate     = plFullstates['uav_'+i]
-        cont_stack      = cont_stacks['uav_'+i]
-        
+    
+        full_state = uav_.fullState
+        cont_stack = uav_.ctrlInps 
+        ref_state  = uav_.refState
+     
+        if uav_.pload:
+            payload     = payloads[id]
+            
         plt.rcParams['axes.grid'] = True
         plt.rcParams['figure.max_open_warning'] = 100
         
@@ -180,7 +175,7 @@ def outputPlots(uavs, ids, plFullstates, ref_states, full_states, cont_stacks, s
         posdes    = ref_state[:,0:3]
         linVeldes = ref_state[:,3::]
         ts = 'time [s]'
-        
+    
         poserr  = (posdes[:,:] - pos[:,:]).reshape(len(full_state),3)
         linVerr = (linVeldes[:,:] - linVel[:,:]).reshape(len(full_state),3) 
 
@@ -261,8 +256,8 @@ def outputPlots(uavs, ids, plFullstates, ref_states, full_states, cont_stacks, s
         ax10.legend()
         ax10 = setlimits(ax10, pos)
 
-        if uavModel.pload:
-            fig8, fig9, fig10, fig11, fig12 = plotPayloadStates(plFullstate, pos, tf_sim)
+        if uav_.pload:
+            fig8, fig9, fig10, fig11, fig12 = plotPayloadStates(payload.plFullState, pos, tf_sim)
         if savePlot:
             textfig.savefig(f, format='pdf', bbox_inches='tight')
             fig1.savefig(f, format='pdf', bbox_inches='tight')
@@ -272,7 +267,7 @@ def outputPlots(uavs, ids, plFullstates, ref_states, full_states, cont_stacks, s
             fig5.savefig(f, format='pdf', bbox_inches='tight')  
             fig6.savefig(f, format='pdf', bbox_inches='tight')
             fig7.savefig(f, format='pdf', bbox_inches='tight')
-            if uavModel.pload:
+            if uav_.pload:
                 fig8.savefig(f, format='pdf', bbox_inches='tight')
                 fig9.savefig(f, format='pdf', bbox_inches='tight')
                 fig10.savefig(f, format='pdf', bbox_inches='tight')
@@ -310,15 +305,12 @@ def Sphere(Cx, Cy, Cz, r):
 
     
 class PlotandAnimate:
-    def __init__(self, fig, ax, uavModels, ids, plFullstates, full_states, reference_states, sample): 
+    def __init__(self, fig, ax, uavModels, payloads, sample): 
         # Initialize the Actual and Reference states
-        self.full_states      = full_states
-        self.reference_states = reference_states
-        self.ids              = ids
-        self.plFullstates     = plFullstates
-        self.uavModels        = uavModels
-        self.sample           = sample
-        self.frames           = len(list(self.full_states.values())[0][::sample, :])
+        self.payloads  = payloads
+        self.uavModels = uavModels
+        self.sample    = sample
+        self.frames    = len(list(self.uavModels.values())[0].fullState[::self.sample, :])
         # Initialize a 3d figure
         self.fig = fig
         self.ax  = ax
@@ -351,21 +343,14 @@ class PlotandAnimate:
         # edge: adds extra space for the figure 
         edge = 0.5
         maxs_  = []
-        for i in self.ids:
-            self.full_state  = self.full_states['uav_'+i]
-            max_x = max(self.full_state[:,0])
-            max_y = max(self.full_state[:,1])
-            max_z = max(self.full_state[:,2])
+        for uav in self.uavModels.values():
+            max_x = max(uav.fullState[:,0])
+            max_y = max(uav.fullState[:,1])
+            max_z = max(uav.fullState[:,2])
             if (max_x >= max_y) and (max_x >= max_z):
                 max_ = max_x
-                # self.ax.set_xlim3d([-max_-edge, max_+edge])
-                # self.ax.set_ylim3d([-max_-edge, max_+edge])
-                # self.ax.set_zlim3d([-max_-edge, max_+edge])
             elif (max_y >= max_x) and (max_y >= max_z):
                 max_ = max_y
-                # self.ax.set_xlim3d([-max_-edge, max_+edge])
-                # self.ax.set_ylim3d([-max_-edge, max_+edge])
-                # self.ax.set_zlim3d([-max_-edge, max_+edge])
             else:
                 max_ = max_z
             maxs_.append(max_)
@@ -457,11 +442,13 @@ class PlotandAnimate:
         self.ax.cla()
         self.setlimits()
             
-        for j in self.ids:
-            self.uavModel        = self.uavModels['uav_'+j]
-            self.full_state      = self.full_states['uav_'+j][::self.sample, :]
-            self.reference_state =  self.reference_states['uav_'+j][::self.sample, :]
-            self.plFullstate     = self.plFullstates['uav_'+j][::self.sample, :]
+        for id in self.uavModels.keys():
+            self.uavModel        = self.uavModels[id]
+            self.full_state      = self.uavModel.fullState[::self.sample, :]
+            self.reference_state =  self.uavModel.refState[::self.sample, :]
+            if self.uavModel.pload:
+                self.payload          = self.payloads[id]
+                self.plFullstate = self.payload.plFullState[::self.sample, :]            
             self.initializeQuad()
             x, y, z, q                   = self.getCurrState(i)
             xref,yref,zref               = self.getRefState(i) 

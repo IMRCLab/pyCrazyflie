@@ -24,6 +24,7 @@ class Payload:
         self.state   = state
         self.dt      = dt
 
+        self.plFullState = np.empty((1,19))
     def __str__(self):
         return "payload m = {} kg, length of cable = {} m, \n\n Initial State = {}".format(self.mp, self.lc, self.state)
 
@@ -66,10 +67,12 @@ class Payload:
         self.state[9:12]  = wlNext # Payload angular velocity in Inertial Frame
         self.state[12:16] = qNext # Quadrotor attitude [q = qw, qx, qy, qz]
         self.state[16::]  = wNext # Quadrotor angular velocity [w = wx, wy, wz]
+        self.plFullState  = np.vstack((self.plFullState, self.state))
         return self.state
 
-
-
+    def cursorUp(self):
+            ## This method removes the first row of the stack which is initialized as an empty array
+            self.plFullState = np.delete(self.plFullState, 0, 0)
 
 class UavModel:
     """initialize an instance of UAV object with the following physical parameters:
@@ -94,6 +97,9 @@ class UavModel:
         self.state = state
         self.dt    = dt
 
+        self.fullState = np.empty((1,13))
+        self.ctrlInps  = np.empty((1,8))
+        self.refState  = np.empty((1,6))
         self.drag  = float((uav_params['drag']))
         if self.drag ==  1:
             self.Kaero = np.diag([-9.1785e-7, -9.1785e-7, -10.311e-7]) 
@@ -140,8 +146,24 @@ class UavModel:
         self.state[3:6]  = velNext  # linear velocity: xdot, ydot, zdot
         self.state[6:10] = qNext# quaternions: [qw, qx, qy, qz]
         self.state[10::] = wNext # angular velocity: wx, wy, wz
-        return self.state
     
+        return self.state
+
+    def stackStandCtrl(self, state, tau_inp, ref_state):
+        ## This method stacks the actual and reference states of the UAV 
+        ## and the control input vector [fz taux, tauy, tauz, f1, f2, f3, f4]
+        self.state = state
+        self.fullState  = np.vstack((self.fullState, self.state))
+        f_motors   = self.invAll @ tau_inp 
+        self.ctrlInps   = np.vstack((self.ctrlInps, np.array([tau_inp, f_motors]).reshape(1,8)))
+        self.refState   = np.vstack((self.refState, ref_state))
+   
+    def cursorUp(self):
+        ## This method removes the first row of the stack which is initialized as an empty array
+        self.fullState = np.delete(self.fullState, 0, 0)
+        self.ctrlInps  = np.delete(self.ctrlInps,  0, 0)
+        self.refState  = np.delete(self.refState,  0, 0)
+
     def wMotors(self, f_motor):
         """This method transforms the current thrust for each motor to command input to angular velocity  in [rad/s]"""
         coef    = [5.484560e-4, 1.032633e-6 , 2.130295e-11]

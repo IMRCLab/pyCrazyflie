@@ -14,7 +14,7 @@ Robots:
       init_linVel_Q   : [0,  0,  0]
       init_angVel_Q   : [0,  0,  0]
     payload :  
-      mode  : "enabled"
+      mode  : "disabled"
       m_p   : 0.01 # Mass payload [kg]
       l_c   : 1 # Length of cable [m]
       ## INITIAL CONDITIONS FOR PAYLOAD
