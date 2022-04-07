@@ -106,11 +106,12 @@ def plotPayloadStates(full_state, posq, tf_sim):
 
 ###############################################################################################
     norm_x = np.zeros((len(full_state),))
+
     for i in range(0, len(norm_x)):
         norm_x[i] = np.linalg.norm(pos[i,:] - posq[i,:])
 
     ax15.plot(time, norm_x,c='k',lw=1, label='Norm')
-    ax15.set_ylabel('||xq - xp||',labelpad=-5)    
+    ax15.set_ylabel('||xq - xp||',labelpad=-2)    
     fig12.supxlabel(ts,fontsize='small')
 
     grid = plt.GridSpec(3,1)
@@ -121,141 +122,159 @@ def plotPayloadStates(full_state, posq, tf_sim):
 
 
 ###############################################################################################
-def outputPlots(uavModel, plFullstate, ref_state, full_state, cont_stack, savePlot, tf_sim, pdfName):
+def outputPlots(uavs, payloads, savePlot, tf_sim, pdfName):
     print('Plotting...')
-    plt.rcParams['axes.grid'] = True
+    f = PdfPages(pdfName)
+        # perform file operations
+    for id, uav_ in uavs.items():
+        txt = id
+        textfig, textax = plt.subplots(figsize=(6, 6))
+        textax.grid(False)
+        textax.axis(False)
+        textax.text(0.45, 0.45, txt, size=15, color='black')
     
-    fig1, ax1 = plt.subplots(3, 1, sharex=True ,sharey=True)
-    fig1.tight_layout()
+        full_state = uav_.fullState
+        cont_stack = uav_.ctrlInps 
+        ref_state  = uav_.refState
+     
+        if uav_.pload:
+            payload     = payloads[id]
+            
+        plt.rcParams['axes.grid'] = True
+        plt.rcParams['figure.max_open_warning'] = 100
+        
+        fig1, ax1 = plt.subplots(3, 1, sharex=True ,sharey=True)
+        fig1.tight_layout()
+        
+        fig2, ax2 = plt.subplots(3, 1, sharex=True, sharey=True)
+        fig2.tight_layout()
+
+        fig3, ax3 = plt.subplots(3, 1, sharex=True ,sharey=True)
+        fig3.tight_layout()
+
+        fig4, ax4 = plt.subplots(2, 3, sharex=True ,sharey=True)
+        fig4.tight_layout()
+
+        fig5 = plt.figure(constrained_layout=True)
+        gs = GridSpec(3, 2, figure=fig5)
+
+        ax5 = fig5.add_subplot(gs[:, 0])
+        ax6 = fig5.add_subplot(gs[0,1])
+        ax7 = fig5.add_subplot(gs[1,1],sharey=ax6)
+        ax8 = fig5.add_subplot(gs[2,1],sharey=ax6)
+
+        fig6, ax9 = plt.subplots(4, 1, sharex=True ,sharey=True,figsize=(9,4.8))
+        fig6.tight_layout()
+
+
+        time   = np.linspace(0, tf_sim*1e-3, num=len(full_state)) 
+        pos    = full_state[:,0:3]
+        linVel = full_state[:,3:6]
+        angVel = full_state[:,10::]
     
-    fig2, ax2 = plt.subplots(3, 1, sharex=True, sharey=True)
-    fig2.tight_layout()
-
-    fig3, ax3 = plt.subplots(3, 1, sharex=True ,sharey=True)
-    fig3.tight_layout()
-
-    fig4, ax4 = plt.subplots(2, 3, sharex=True ,sharey=True)
-    fig4.tight_layout()
-
-    fig5 = plt.figure(constrained_layout=True)
-    gs = GridSpec(3, 2, figure=fig5)
-
-    ax5 = fig5.add_subplot(gs[:, 0])
-    ax6 = fig5.add_subplot(gs[0,1])
-    ax7 = fig5.add_subplot(gs[1,1],sharey=ax6)
-    ax8 = fig5.add_subplot(gs[2,1],sharey=ax6)
-
-    fig6, ax9 = plt.subplots(4, 1, sharex=True ,sharey=True,figsize=(9,4.8))
-    fig6.tight_layout()
-
-
-    time   = np.linspace(0, tf_sim*1e-3, num=len(full_state)) 
-    pos    = full_state[:,0:3]
-    linVel = full_state[:,3:6]
-    angVel = full_state[:,10::]
-  
-    posdes    = ref_state[:,0:3]
-    linVeldes = ref_state[:,3::]
-    ts = 'time [s]'
+        posdes    = ref_state[:,0:3]
+        linVeldes = ref_state[:,3::]
+        ts = 'time [s]'
     
-    poserr  = (posdes[:,:] - pos[:,:]).reshape(len(full_state),3)
-    linVerr = (linVeldes[:,:] - linVel[:,:]).reshape(len(full_state),3) 
+        poserr  = (posdes[:,:] - pos[:,:]).reshape(len(full_state),3)
+        linVerr = (linVeldes[:,:] - linVel[:,:]).reshape(len(full_state),3) 
 
-    ###################################
+        ###################################
 
-    ax1[0].plot(time, pos[:,0], c='k', lw=0.75,label='Actual'), ax1[1].plot(time, pos[:,1], lw=0.75, c='k'), ax1[2].plot(time, pos[:,2], lw=0.75, c='k')
-    ax1[0].plot(time, posdes[:,0], lw=0.75, c='darkgreen',label='Reference'), ax1[1].plot(time, posdes[:,1], lw=0.75, c='darkgreen'), ax1[2].plot(time, posdes[:,2], lw=0.75, c='darkgreen')
-    ax1[0].set_ylabel('x [m]',), ax1[1].set_ylabel('y [m]'), ax1[2].set_ylabel('z [m]')
-    ax1[0].legend()
-    fig1.supxlabel(ts,fontsize='small')
+        ax1[0].plot(time, pos[:,0], c='k', lw=0.75,label='Actual'), ax1[1].plot(time, pos[:,1], lw=0.75, c='k'), ax1[2].plot(time, pos[:,2], lw=0.75, c='k')
+        ax1[0].plot(time, posdes[:,0], lw=0.75, c='darkgreen',label='Reference'), ax1[1].plot(time, posdes[:,1], lw=0.75, c='darkgreen'), ax1[2].plot(time, posdes[:,2], lw=0.75, c='darkgreen')
+        ax1[0].set_ylabel('x [m]',), ax1[1].set_ylabel('y [m]'), ax1[2].set_ylabel('z [m]')
+        ax1[0].legend()
+        fig1.supxlabel(ts,fontsize='small')
 
-    grid = plt.GridSpec(3,1)
-    create_subtitle(fig1, grid[0, ::], 'Actual vs Reference Positions')
+        grid = plt.GridSpec(3,1)
+        create_subtitle(fig1, grid[0, ::], 'Actual vs Reference Positions')
 
-    ###################################
-      
-    ax2[0].plot(time, linVel[:,0],lw=0.75, c='k' ,label='Actual'), ax2[1].plot(time, linVel[:,1],lw=0.75, c='k'), ax2[2].plot(time, linVel[:,2],lw=0.75, c='k')
-    ax2[0].plot(time, linVeldes[:,0],lw=0.75, c='darkgreen',label='Reference'), ax2[1].plot(time, linVeldes[:,1],lw=0.75, c='darkgreen'), ax2[2].plot(time, linVeldes[:,2],lw=0.75, c='darkgreen')
-    ax2[0].set_ylabel('vx [m/s]'), ax2[1].set_ylabel('vy [m/s]'), ax2[2].set_ylabel('vz [m/s]')
-    ax2[0].legend()
-    fig2.supxlabel(ts,fontsize='small')
+        ###################################
+        
+        ax2[0].plot(time, linVel[:,0],lw=0.75, c='k' ,label='Actual'), ax2[1].plot(time, linVel[:,1],lw=0.75, c='k'), ax2[2].plot(time, linVel[:,2],lw=0.75, c='k')
+        ax2[0].plot(time, linVeldes[:,0],lw=0.75, c='darkgreen',label='Reference'), ax2[1].plot(time, linVeldes[:,1],lw=0.75, c='darkgreen'), ax2[2].plot(time, linVeldes[:,2],lw=0.75, c='darkgreen')
+        ax2[0].set_ylabel('vx [m/s]'), ax2[1].set_ylabel('vy [m/s]'), ax2[2].set_ylabel('vz [m/s]')
+        ax2[0].legend()
+        fig2.supxlabel(ts,fontsize='small')
 
-    grid = plt.GridSpec(3,1)
-    create_subtitle(fig2, grid[0, ::], 'Actual vs Reference Linear Velocities')
+        grid = plt.GridSpec(3,1)
+        create_subtitle(fig2, grid[0, ::], 'Actual vs Reference Linear Velocities')
 
-    ###################################
+        ###################################
 
-    ax3[0].plot(time, angVel[:,0],c='k',lw=1)
-    ax3[1].plot(time, angVel[:,1],c='k',lw=1)
-    ax3[2].plot(time, angVel[:,2],c='k',lw=1)
-    ax3[0].set_ylabel('wx [deg/s]',labelpad=-5), ax3[1].set_ylabel('wy [deg/s]',labelpad=-5), ax3[2].set_ylabel('wz [deg/s]',labelpad=-5)
-    fig3.supxlabel(ts,fontsize='small')
+        ax3[0].plot(time, angVel[:,0],c='k',lw=1)
+        ax3[1].plot(time, angVel[:,1],c='k',lw=1)
+        ax3[2].plot(time, angVel[:,2],c='k',lw=1)
+        ax3[0].set_ylabel('wx [deg/s]',labelpad=-5), ax3[1].set_ylabel('wy [deg/s]',labelpad=-5), ax3[2].set_ylabel('wz [deg/s]',labelpad=-5)
+        fig3.supxlabel(ts,fontsize='small')
 
-    grid = plt.GridSpec(3,1)
-    create_subtitle(fig3, grid[0, ::], 'Actual Angular Velocities')
+        grid = plt.GridSpec(3,1)
+        create_subtitle(fig3, grid[0, ::], 'Actual Angular Velocities')
 
-    ###################################
+        ###################################
 
-    ax4[0,0].plot(time, poserr[:,0],c='r',lw=0.7), ax4[0,1].plot(time, poserr[:,1],c='r',lw=0.7), ax4[0,2].plot(time, poserr[:,2],c='r',lw=0.7)
-    ax4[0,0].set_ylabel('ex [m/s]'), ax4[0,1].set_ylabel('ey [m/s]'), ax4[0,2].set_ylabel('ez [m/s]')
-    
-    ax4[1,0].plot(time, linVerr[:,0],c='r',lw=0.7), ax4[1,1].plot(time, linVerr[:,1],c='r',lw=0.7), ax4[1,2].plot(time, linVerr[:,2],c='r',lw=0.7)
-    ax4[1,0].set_ylabel('vex des [m/s]'), ax4[1,1].set_ylabel('vey des [m/s]'), ax4[1,2].set_ylabel('vez des [m/s]')
-    fig4.supxlabel(ts,fontsize='small')
+        ax4[0,0].plot(time, poserr[:,0],c='r',lw=0.7), ax4[0,1].plot(time, poserr[:,1],c='r',lw=0.7), ax4[0,2].plot(time, poserr[:,2],c='r',lw=0.7)
+        ax4[0,0].set_ylabel('ex [m/s]'), ax4[0,1].set_ylabel('ey [m/s]'), ax4[0,2].set_ylabel('ez [m/s]')
+        
+        ax4[1,0].plot(time, linVerr[:,0],c='r',lw=0.7), ax4[1,1].plot(time, linVerr[:,1],c='r',lw=0.7), ax4[1,2].plot(time, linVerr[:,2],c='r',lw=0.7)
+        ax4[1,0].set_ylabel('vex des [m/s]'), ax4[1,1].set_ylabel('vey des [m/s]'), ax4[1,2].set_ylabel('vez des [m/s]')
+        fig4.supxlabel(ts,fontsize='small')
 
-    grid = plt.GridSpec(2,3)
-    create_subtitle(fig4, grid[0, ::], 'Positional errors')
-    create_subtitle(fig4, grid[1, ::], 'Linear Velocities errors')
-    
-    ###################################
+        grid = plt.GridSpec(2,3)
+        create_subtitle(fig4, grid[0, ::], 'Positional errors')
+        create_subtitle(fig4, grid[1, ::], 'Linear Velocities errors')
+        
+        ###################################
 
-    ax5.plot(time, cont_stack[:,0],lw=0.8, c='darkblue')
-    ax5.set_ylabel('fz [N]')
-    
-    ax6.plot(time, cont_stack[:,1], lw=0.8, c='darkblue'), ax7.plot(time, cont_stack[:,2], lw=0.8, c='darkblue'), ax8.plot(time, cont_stack[:,3],lw=0.8, c='darkblue')
-    ax6.set_ylabel('taux [N.m]',fontsize='small'), ax7.set_ylabel('tauy [N.m]',fontsize='small'), ax8.set_ylabel('tauz [N.m]',fontsize='small')
-    fig5.supxlabel(ts,fontsize='small')
+        ax5.plot(time, cont_stack[:,0],lw=0.8, c='darkblue')
+        ax5.set_ylabel('fz [N]')
+        
+        ax6.plot(time, cont_stack[:,1], lw=0.8, c='darkblue'), ax7.plot(time, cont_stack[:,2], lw=0.8, c='darkblue'), ax8.plot(time, cont_stack[:,3],lw=0.8, c='darkblue')
+        ax6.set_ylabel('taux [N.m]',fontsize='small'), ax7.set_ylabel('tauy [N.m]',fontsize='small'), ax8.set_ylabel('tauz [N.m]',fontsize='small')
+        fig5.supxlabel(ts,fontsize='small')
 
-    create_subtitle(fig5, gs[::, 0], 'Force Control Input')
-    create_subtitle(fig5, gs[::, 1], 'Torque Control Input')
+        create_subtitle(fig5, gs[::, 0], 'Force Control Input')
+        create_subtitle(fig5, gs[::, 1], 'Torque Control Input')
 
-    ###################################
-    ax9[0].plot(time, cont_stack[:,4], c='darkred',lw=0.7)
-    ax9[1].plot(time, cont_stack[:,5], c='darkred',lw=0.7)
-    ax9[2].plot(time, cont_stack[:,6], c='darkred',lw=0.7)
-    ax9[3].plot(time, cont_stack[:,7], c='darkred',lw=0.7)
-    ax9[0].set_ylabel('f1 [N]'), ax9[1].set_ylabel('f2 [N]'), ax9[2].set_ylabel('f3 [N]'), ax9[3].set_ylabel('f4 [N]')
-    fig6.supxlabel(ts,fontsize='small')
+        ###################################
+        ax9[0].plot(time, cont_stack[:,4], c='darkred',lw=0.7)
+        ax9[1].plot(time, cont_stack[:,5], c='darkred',lw=0.7)
+        ax9[2].plot(time, cont_stack[:,6], c='darkred',lw=0.7)
+        ax9[3].plot(time, cont_stack[:,7], c='darkred',lw=0.7)
+        ax9[0].set_ylabel('f1 [N]'), ax9[1].set_ylabel('f2 [N]'), ax9[2].set_ylabel('f3 [N]'), ax9[3].set_ylabel('f4 [N]')
+        fig6.supxlabel(ts,fontsize='small')
 
-    grid = plt.GridSpec(4,1)
-    create_subtitle(fig6, grid[0,::], 'Motor Forces')
-    ###################################
+        grid = plt.GridSpec(4,1)
+        create_subtitle(fig6, grid[0,::], 'Motor Forces')
+        ###################################
 
-    fig7 = plt.figure(figsize=(10,10))
-    ax10 = fig7.add_subplot(autoscale_on=True,projection="3d")
-    ax10.plot3D(pos[:,0], pos[:,1], pos[:,2], 'k-.',lw=1.5, label="Actual Trajectory")
-    ax10.plot3D(posdes[:,0], posdes[:,1] , posdes[:,2],'darkgreen',ls='--',lw=1.5,label="Reference Trajectory")
-    ax10.legend()
-    ax10 = setlimits(ax10, pos)
+        fig7 = plt.figure(figsize=(10,10))
+        ax10 = fig7.add_subplot(autoscale_on=True,projection="3d")
+        ax10.plot3D(pos[:,0], pos[:,1], pos[:,2], 'k-.',lw=1.5, label="Actual Trajectory")
+        ax10.plot3D(posdes[:,0], posdes[:,1] , posdes[:,2],'darkgreen',ls='--',lw=1.5,label="Reference Trajectory")
+        ax10.legend()
+        ax10 = setlimits(ax10, pos)
 
-    if uavModel.pload:
-        fig8, fig9, fig10, fig11, fig12 = plotPayloadStates(plFullstate, pos, tf_sim)
-    if savePlot:
-        with PdfPages(pdfName) as pdf:
-            fig1.savefig(pdf, format='pdf', bbox_inches='tight')
-            fig2.savefig(pdf, format='pdf', bbox_inches='tight')
-            fig3.savefig(pdf, format='pdf', bbox_inches='tight')
-            fig4.savefig(pdf, format='pdf', bbox_inches='tight')  
-            fig5.savefig(pdf, format='pdf', bbox_inches='tight')  
-            fig6.savefig(pdf, format='pdf', bbox_inches='tight')
-            fig7.savefig(pdf, format='pdf', bbox_inches='tight')
-            if uavModel.pload:
-                fig8.savefig(pdf, format='pdf', bbox_inches='tight')
-                fig9.savefig(pdf, format='pdf', bbox_inches='tight')
-                fig10.savefig(pdf, format='pdf', bbox_inches='tight')
-                fig11.savefig(pdf, format='pdf', bbox_inches='tight')
-                fig12.savefig(pdf, format='pdf', bbox_inches='tight')
-    plt.show()
+        if uav_.pload:
+            fig8, fig9, fig10, fig11, fig12 = plotPayloadStates(payload.plFullState, pos, tf_sim)
+        if savePlot:
+            textfig.savefig(f, format='pdf', bbox_inches='tight')
+            fig1.savefig(f, format='pdf', bbox_inches='tight')
+            fig2.savefig(f, format='pdf', bbox_inches='tight')
+            fig3.savefig(f, format='pdf', bbox_inches='tight')
+            fig4.savefig(f, format='pdf', bbox_inches='tight')  
+            fig5.savefig(f, format='pdf', bbox_inches='tight')  
+            fig6.savefig(f, format='pdf', bbox_inches='tight')
+            fig7.savefig(f, format='pdf', bbox_inches='tight')
+            if uav_.pload:
+                fig8.savefig(f, format='pdf', bbox_inches='tight')
+                fig9.savefig(f, format='pdf', bbox_inches='tight')
+                fig10.savefig(f, format='pdf', bbox_inches='tight')
+                fig11.savefig(f, format='pdf', bbox_inches='tight')
+                fig12.savefig(f, format='pdf', bbox_inches='tight')
+
+    f.close()
 
 
 def RotatedCylinder(center_x, center_y, radius, height_z, q):
@@ -286,16 +305,18 @@ def Sphere(Cx, Cy, Cz, r):
 
     
 class PlotandAnimate:
-    def __init__(self, fig, ax, uavModel, plFullstate, full_state, reference_state): 
+    def __init__(self, fig, ax, uavModels, payloads, sample): 
         # Initialize the Actual and Reference states
-        self.full_state      = full_state
-        self.reference_state = reference_state
-        self.plFullstate     = plFullstate
-        self.uavModel        = uavModel
+        self.payloads  = payloads
+        self.uavModels = uavModels
+        self.sample    = sample
+        self.frames    = len(list(self.uavModels.values())[0].fullState[::self.sample, :])
         # Initialize a 3d figure
         self.fig = fig
         self.ax  = ax
         self.ax.view_init(25,35)
+
+    def initializeQuad(self):    
         # Create the lines and vectors to draw body and desired frames
         self.line, = self.ax.plot(self.full_state[0,0:1], self.full_state[1,0:1], self.full_state[2,0:1], 'b--', lw=1)
         self.vec1  = self.ax.quiver([],[],[],[],[],[])
@@ -313,32 +334,35 @@ class PlotandAnimate:
         self._armb2 = rot90z @ (self._armb1.reshape(3,))
 
     def startAnimation(self,videoname,dt):
-        self.ani = animation.FuncAnimation(self.fig, self.animate, frames=len(self.full_state), interval=dt*1000,blit=True)
+       
+        self.ani = animation.FuncAnimation(self.fig, self.animate, frames=self.frames, interval=dt*1000,blit=True)
         self.ani.save('Videos/'+videoname)
 
     def setlimits(self):
-        # This method finds the maximum value in the x-y-z actual states and sets the limits of the figure accordingly   
+        # This method finds the maximum value in the x-y-z actual states for the UAV(s) and sets the limits of the figure accordingly   
         # edge: adds extra space for the figure 
-        edge  = 0.1
-        max_x = max(self.reference_state[:,0])
-        max_y = max(self.reference_state[:,1])
-        max_z = max(self.reference_state[:,2])
-        if (max_x >= max_y) and (max_x >= max_z):
-            max_ = max_x
-            self.ax.set_xlim3d([-max_-edge, max_+edge])
-            self.ax.set_ylim3d([-max_-edge, max_+edge])
-            self.ax.set_zlim3d([-max_-edge, max_+edge])
-        elif (max_y >= max_x) and (max_y >= max_z):
-            max_ = max_y
-            self.ax.set_xlim3d([-max_-edge, max_+edge])
-            self.ax.set_ylim3d([-max_-edge, max_+edge])
-            self.ax.set_zlim3d([-max_-edge, max_+edge])
-        else:
-            max_ = max_z
-            self.ax.set_xlim3d([-max_-edge, max_+edge])
-            self.ax.set_ylim3d([-max_-edge, max_+edge])
-            self.ax.set_zlim3d([-max_-edge, max_+edge])
-       
+        edge = 0.5
+        maxs_  = []
+        for uav in self.uavModels.values():
+            max_x = max(uav.fullState[:,0])
+            max_y = max(uav.fullState[:,1])
+            max_z = max(uav.fullState[:,2])
+            if (max_x >= max_y) and (max_x >= max_z):
+                max_ = max_x
+            elif (max_y >= max_x) and (max_y >= max_z):
+                max_ = max_y
+            else:
+                max_ = max_z
+            maxs_.append(max_)
+
+        max_ = max(maxs_)
+
+        self.ax.set_xlim3d([-max_-edge, max_+edge])
+        self.ax.set_ylim3d([-max_-edge, max_+edge])
+        self.ax.set_zlim3d([-max_-edge, max_+edge])
+        self.ax.set_xlim3d([-max_-edge, max_+edge])
+        self.ax.set_ylim3d([-max_-edge, max_+edge])
+        self.ax.set_zlim3d([-max_-edge, max_+edge])
         self.ax.set_xlabel('X')
         self.ax.set_ylabel('Y')
         self.ax.set_zlabel('Z')
@@ -384,7 +408,7 @@ class PlotandAnimate:
     def drawActvsRefTraj(self, x, y, z, xref, yref, zref):
             self.ax.plot3D(x, y, z, 'k-.',lw=1.5,label="Actual Trajectory")
             self.ax.plot3D(xref, yref ,zref,c='darkgreen',ls='--',lw=1.5,label="Reference Trajectory")
-            self.ax.legend()
+            # self.ax.legend()
 
     def drawQuadrotorArms(self, x, y, z, armI1, armI2, _armI1, _armI2):
         self.ax.plot3D(np.linspace(x, armI1[0]), np.linspace(y, armI1[1]), np.linspace(z, armI1[2]),'k',lw=2)
@@ -407,7 +431,7 @@ class PlotandAnimate:
 
     def drawPlTraj(self, xl,yl,zl):
         self.ax.plot3D(xl, yl, zl, 'darkblue',linestyle='-.',lw=1.5,label="Payload Trajectory")
-        self.ax.legend()
+        # self.ax.legend()
 
     def drawPayload(self,x,y,z,xl,yl,zl):
         c_st = np.array([x,y,z])
@@ -417,24 +441,33 @@ class PlotandAnimate:
     def animate(self,i):
         self.ax.cla()
         self.setlimits()
-        x, y, z, q                   = self.getCurrState(i)
-        xref,yref,zref               = self.getRefState(i) 
-        armI1, armI2, _armI1, _armI2 = self.getArmpos(x[i],y[i],z[i],q)
+            
+        for id in self.uavModels.keys():
+            self.uavModel        = self.uavModels[id]
+            self.full_state      = self.uavModel.fullState[::self.sample, :]
+            self.reference_state =  self.uavModel.refState[::self.sample, :]
+            if self.uavModel.pload:
+                self.payload          = self.payloads[id]
+                self.plFullstate = self.payload.plFullState[::self.sample, :]            
+            self.initializeQuad()
+            x, y, z, q                   = self.getCurrState(i)
+            xref,yref,zref               = self.getRefState(i) 
+            armI1, armI2, _armI1, _armI2 = self.getArmpos(x[i],y[i],z[i],q)
 
-        if self.uavModel.pload:
-            xl, yl, zl  = self.getPayloadStates(i)
-            self.drawPayload(x[i], y[i], z[i], xl[i], yl[i], zl[i])
-            self.drawPlTraj(xl, yl, zl)
-            r = 1e-1
-            xsp, ysp, zsp = Sphere(xl, yl, zl, r)
-            self.ax.plot_surface(xl[i]+xsp, yl[i]+ysp, zl[i]+zsp, cmap=plt.cm.YlGnBu_r)
-        self.drawQuivers(x[i],y[i],z[i], q, xref[i], yref[i], zref[i])
-        self.drawActvsRefTraj(x, y, z, xref, yref, zref)
-        self.drawQuadrotorArms(x[i], y[i], z[i], armI1, armI2, _armI1, _armI2)
+            if self.uavModel.pload:
+                xl, yl, zl  = self.getPayloadStates(i)
+                self.drawPayload(x[i], y[i], z[i], xl[i], yl[i], zl[i])
+                # self.drawPlTraj(xl, yl, zl)
+                r = 1e-1
+                xsp, ysp, zsp = Sphere(xl, yl, zl, r)
+                self.ax.plot_surface(xl[i]+xsp, yl[i]+ysp, zl[i]+zsp, cmap=plt.cm.YlGnBu_r)
+            self.drawQuivers(x[i],y[i],z[i], q, xref[i], yref[i], zref[i])
+            self.drawActvsRefTraj(x, y, z, xref, yref, zref)
+            self.drawQuadrotorArms(x[i], y[i], z[i], armI1, armI2, _armI1, _armI2)
 
-        Xb,Yb,Zb = RotatedCylinder(0,0,0.1,0.1,q) 
-        self.drawPropellers(Xb, Yb, Zb,armI1, armI2, _armI1, _armI2)
-
+            Xb,Yb,Zb = RotatedCylinder(0,0,0.1,0.1,q) 
+            self.drawPropellers(Xb, Yb, Zb,armI1, armI2, _armI1, _armI2)
+        
         return self.line, 
 
 
