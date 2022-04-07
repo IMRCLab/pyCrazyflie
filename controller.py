@@ -269,10 +269,6 @@ def main(filename, animateOrPlotdict, params):
         if uav_.pload:
             payload.cursorUp()
             payloads[id] = payload
-
- # Cursor up one line
-    # for id in uavs.keys():
-    #     ref_states[id]  = np.delete(ref_states[id], 0, 0)
     # Animation        
     animateOrPlot(uavs, payloads, animateOrPlotdict, filename, tf_sim)    
 
