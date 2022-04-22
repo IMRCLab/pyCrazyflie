@@ -30,6 +30,6 @@ Add _cffirmware-firmware/_ to your `PYTHONPATH`. Open a terminal in the `pyCrazy
     python3 controller.py name_of_the_file --animate --plotSave
     ``` 
 * [ ] `--animate` and `--savePlot` are flags. Their defaults are both False. 
-
+* [ ] The animation will be saved in the `Videos` Directory, while the pdf will be saved in the main `pyCrazyflie` directory.
 ## Expected Output in Vidoes Directory
 ![Markdown Logo](Videos/infinity8.gif)
