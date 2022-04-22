@@ -14,10 +14,10 @@ def skew(w):
 
 
 class Payload:
-    def __init__(self, dt, state, uav_params):
-        self.mp      = float(uav_params['m_p']) # Mass of payload [kg]
-        self.lc      = float(uav_params['l_c'])  # length of cable [m]
-        self.m       = float(uav_params['m']) # Mass of quadrotor [kg]
+    def __init__(self, dt, state, params):
+        self.mp      = float(params['m_p']) # Mass of payload [kg]
+        self.lc      = float(params['l_c'])  # length of cable [m]
+        self.m       = float(params['m']) # Mass of quadrotor [kg]
         self.mt      = self.m + self.mp # Total mass [kg]
         self.grav_   = np.array([0,0,-self.mt*9.81])
         # state = [xl, yl, zl, xldot, yldot, zldot, px, py, pz, wlx, wly, wlz, qw, qx, qy, qz, wx, wy, wz]
@@ -73,6 +73,17 @@ class Payload:
     def cursorUp(self):
             ## This method removes the first row of the stack which is initialized as an empty array
             self.plFullState = np.delete(self.plFullState, 0, 0)
+
+class SharedPayload(Payload):
+    def __init__(self, state, payload_params, uavs_params):
+        self.mp = float(payload_params['m_p']) # Mass of payload [kg]
+        # self.lc  = float(payload_params['l_c'])  # length of cable [m]
+        self.mt_  = 0
+        for name, uav in uavs_params.items():
+            self.mt_ += float(uav['m']) # Mass of quadrotors [kg]  
+        self.mt = self.mp + self.mt_ # total mass of quadrotors and payload
+        self.state = state
+        print(self.mt)
 
 class UavModel:
     """initialize an instance of UAV object with the following physical parameters:
@@ -184,3 +195,5 @@ class UavModel:
         R_IB = to_matrix(self.state[6:10])
         fa   = wSum * self.Kaero @ np.transpose(R_IB) @ self.state[3:6]
         return fa
+
+

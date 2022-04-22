@@ -188,10 +188,8 @@ def animateOrPlot(uavs, payloads, animateOrPlotdict, filename, tf_sim):
 
 def setParams(params):
     dt           = float(params['dt'])
-    uavs         = {}
-    payloads     = {}
-    trajectories = {}
-    # print(params['Robots'])
+    uavs, payloads, trajectories  = {}, {}, {}
+    
     for name, robot in params['Robots'].items():
         trajectories['uav_'+name]   = robot['refTrajPath']
         if robot['payload']['mode'] in 'enabled':
@@ -207,6 +205,21 @@ def setParams(params):
             uav1           = uav.UavModel(dt, initState, uav_params) 
             uavs['uav_'+name] = uav1
     return uavs, payloads, trajectories        
+
+# def initial
+
+def setTeamParams(params):
+    dt    = float(params['dt'])
+    uavs, trajectory= {}, {}, {}
+    trajectory['payload'] = params['RobotswithPayload']['payload']['refTrajPath']
+    
+    payload_params = {**params['RobotswithPayload']['payload'], 'dt': dt}
+    uavs_params = {}
+    for name, robot in params['RobotswithPayload']['Robots'].items():
+        uavs_params.update({name: {**robot['initConditions'], 'm': robot['m'], 'l_c':robot['l_c']}})
+        dt, initState = initializeStateWithPayload(payload_params, uavs_params)
+    payload = uav.SharedPayload(0, payload_params, uavs_params)
+    return uavs, payload, trajectory
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##        
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##
 def main(filename, animateOrPlotdict, params):
@@ -214,11 +227,16 @@ def main(filename, animateOrPlotdict, params):
     # dt: time interval
     # initState: initial state
     # set it as 1 tick: i.e: 1 ms
-    # lpoad: payload flag, enabled: with payload, otherwise: no payload 
-    uavs, payloads, trajectories = setParams(params)
+    # pload: payload flag, enabled: with payload, otherwise: no payload 
+    if params['RobotswithPayload']['payload']['mode'] in 'shared':
+       uavs, payload, trajectory = setTeamParams(params)
+    else:
+        uavs, payloads, trajectories = setParams(params)
     # Upload the traj in csv file format
     # rows: time, xdes, ydes, zdes, vxdes, vydes, vzdes, axdes, aydes, azdes  
     timeStamped_traj = {}
+    if not uavs:
+         sys.exit('no UAVs')
     for id in uavs.keys():
         input = trajectories[id]
         timeStamped_traj[id] = np.loadtxt(input, delimiter=',')
