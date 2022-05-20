@@ -41,8 +41,9 @@ def setlimits(ax, full_state):
     ax.set_zlabel('Z')
     return ax
 
-def plotPayloadStates(full_state, posq, tf_sim):
+def plotPayloadStates(payload, posq, tf_sim, shared):
     """This function plots the states of the payload"""
+    full_state = payload.plFullState
     # PL_states = [xl, vl, p, wl]
     fig8, ax11 = plt.subplots(3, 1, sharex=True ,sharey=True)
     fig8.tight_layout()
@@ -63,8 +64,14 @@ def plotPayloadStates(full_state, posq, tf_sim):
     time   = np.linspace(0, tf_sim*1e-3, num=len(full_state)) 
     pos    = full_state[:,0:3]
     linVel = full_state[:,3:6]
-    angVel = full_state[:,9:12]
-    p      = full_state[:,6:9]
+   
+    if not shared:
+        p      = full_state[:,6:9]
+        angVel = full_state[:,9:12]
+    else:
+        numOfquads = payload.numOfquads
+        p  = full_state[:, 6:6+3*numOfquads]
+        angVel = full_state[:,6+3*numOfquads::]
     ts = 'time [s]'
 ###############################################################################################
    
@@ -87,20 +94,30 @@ def plotPayloadStates(full_state, posq, tf_sim):
     create_subtitle(fig9, grid[0, ::], 'Actual Payload Linear Velocities')
 
 ###############################################################################################
-
-    ax13[0].plot(time, angVel[:,0],c='k',lw=1, label='Actual'),  ax13[1].plot(time, angVel[:,1],c='k',lw=1), ax13[2].plot(time, angVel[:,2],c='k',lw=1)
-    ax13[0].set_ylabel('wx [deg/s]',labelpad=-5), ax13[1].set_ylabel('wy [deg/s]',labelpad=-5), ax13[2].set_ylabel('wz [deg/s]',labelpad=-5)
-    fig10.supxlabel(ts,fontsize='small')
-
+    if shared:
+        for i in range(0, numOfquads*3,3):
+            ax13[0].plot(time, angVel[:,i],c='k',lw=1, label='Actual'),  ax13[1].plot(time, angVel[:,i+1],c='k',lw=1), ax13[2].plot(time, angVel[:,i+2],c='k',lw=1)
+            ax13[0].set_ylabel('wx [deg/s]',labelpad=-5), ax13[1].set_ylabel('wy [deg/s]',labelpad=-5), ax13[2].set_ylabel('wz [deg/s]',labelpad=-5)
+            fig10.supxlabel(ts,fontsize='small')
+    else:
+        ax13[0].plot(time, angVel[:,0],c='k',lw=1, label='Actual'),  ax13[1].plot(time, angVel[:,1],c='k',lw=1), ax13[2].plot(time, angVel[:,2],c='k',lw=1)
+        ax13[0].set_ylabel('wx [deg/s]',labelpad=-5), ax13[1].set_ylabel('wy [deg/s]',labelpad=-5), ax13[2].set_ylabel('wz [deg/s]',labelpad=-5)
+        fig10.supxlabel(ts,fontsize='small')
+        
     grid = plt.GridSpec(3,1)
     create_subtitle(fig10, grid[0, ::], ' Actual Payload Angular Velocities')
 
 ###############################################################################################
-    
-    ax14[0].plot(time, p[:,0],c='k',lw=1, label='Actual'), ax14[1].plot(time, p[:,1],c='k',lw=1), ax14[2].plot(time, p[:,2],c='k',lw=1)
-    ax14[0].set_ylabel('px',labelpad=-5), ax14[1].set_ylabel('py',labelpad=-5), ax14[2].set_ylabel('pz',labelpad=-5)
-    fig11.supxlabel(ts,fontsize='small')
-
+    if shared:
+        for i in range(0, numOfquads*3,3):    
+            ax14[0].plot(time, p[:,i],c='k',lw=1, label='Actual'), ax14[1].plot(time, p[:,i+1],c='k',lw=1), ax14[2].plot(time, p[:,i+2],c='k',lw=1)
+            ax14[0].set_ylabel('px',labelpad=-5), ax14[1].set_ylabel('py',labelpad=-5), ax14[2].set_ylabel('pz',labelpad=-5)
+            fig11.supxlabel(ts,fontsize='small')
+    else:
+        ax14[0].plot(time, p[:,0],c='k',lw=1, label='Actual'), ax14[1].plot(time, p[:,1],c='k',lw=1), ax14[2].plot(time, p[:,2],c='k',lw=1)
+        ax14[0].set_ylabel('px',labelpad=-5), ax14[1].set_ylabel('py',labelpad=-5), ax14[2].set_ylabel('pz',labelpad=-5)
+        fig11.supxlabel(ts,fontsize='small')
+        
     grid = plt.GridSpec(3,1)
     create_subtitle(fig11, grid[0, ::], 'Cable Directional Unit Vector')
 
@@ -122,7 +139,7 @@ def plotPayloadStates(full_state, posq, tf_sim):
 
 
 ###############################################################################################
-def outputPlots(uavs, payloads, savePlot, tf_sim, pdfName):
+def outputPlots(uavs, payloads, savePlot, tf_sim, pdfName, shared):
     print('Plotting...')
     f = PdfPages(pdfName)
         # perform file operations
@@ -137,7 +154,9 @@ def outputPlots(uavs, payloads, savePlot, tf_sim, pdfName):
         cont_stack = uav_.ctrlInps 
         ref_state  = uav_.refState
      
-        if uav_.pload:
+        if shared:
+            payload = payloads 
+        elif uav_.pload:
             payload     = payloads[id]
             
         plt.rcParams['axes.grid'] = True
@@ -257,7 +276,7 @@ def outputPlots(uavs, payloads, savePlot, tf_sim, pdfName):
         ax10 = setlimits(ax10, pos)
 
         if uav_.pload:
-            fig8, fig9, fig10, fig11, fig12 = plotPayloadStates(payload.plFullState, pos, tf_sim)
+            fig8, fig9, fig10, fig11, fig12 = plotPayloadStates(payload, pos, tf_sim, shared)
         if savePlot:
             textfig.savefig(f, format='pdf', bbox_inches='tight')
             fig1.savefig(f, format='pdf', bbox_inches='tight')
@@ -305,7 +324,7 @@ def Sphere(Cx, Cy, Cz, r):
 
     
 class PlotandAnimate:
-    def __init__(self, fig, ax, uavModels, payloads, sample): 
+    def __init__(self, fig, ax, uavModels, payloads, sample, shared): 
         # Initialize the Actual and Reference states
         self.payloads  = payloads
         self.uavModels = uavModels
@@ -315,7 +334,7 @@ class PlotandAnimate:
         self.fig = fig
         self.ax  = ax
         self.ax.view_init(25,35)
-
+        self.shared = shared
     def initializeQuad(self):    
         # Create the lines and vectors to draw body and desired frames
         self.line, = self.ax.plot(self.full_state[0,0:1], self.full_state[1,0:1], self.full_state[2,0:1], 'b--', lw=1)
@@ -326,8 +345,8 @@ class PlotandAnimate:
         self.vec2d = self.ax.quiver([],[],[],[],[],[])
         self.vec3d = self.ax.quiver([],[],[],[],[],[])
         #Create the arms of the quadrotor in the body frame
-        self.armb1  = np.array([[self.uavModel.d*10**(2)*np.cos(0)], [self.uavModel.d*10**(2)*np.sin(0)] ,[0]])
-        self._armb1 = np.array([[-self.uavModel.d*10**(2)*np.cos(0)], [-self.uavModel.d*10**(2)*np.sin(0)] ,[0]])
+        self.armb1  = np.array([[self.uavModel.d*10**(1.7)*np.cos(0)], [self.uavModel.d*10**(1.7)*np.sin(0)] ,[0]])
+        self._armb1 = np.array([[-self.uavModel.d*10**(1.7)*np.cos(0)], [-self.uavModel.d*10**(1.7)*np.sin(0)] ,[0]])
         q90z        = rn.from_euler(0, 0, np.radians(90),convention='xyz')
         rot90z      = rn.to_matrix(q90z)
         self.armb2  = rot90z @ (self.armb1.reshape(3,))
@@ -341,7 +360,7 @@ class PlotandAnimate:
     def setlimits(self):
         # This method finds the maximum value in the x-y-z actual states for the UAV(s) and sets the limits of the figure accordingly   
         # edge: adds extra space for the figure 
-        edge = 0.5
+        edge = 0.05
         maxs_  = []
         for uav in self.uavModels.values():
             max_x = max(uav.fullState[:,0])
@@ -447,7 +466,10 @@ class PlotandAnimate:
             self.full_state      = self.uavModel.fullState[::self.sample, :]
             self.reference_state =  self.uavModel.refState[::self.sample, :]
             if self.uavModel.pload:
-                self.payload          = self.payloads[id]
+                if self.shared:
+                    self.payload = self.payloads 
+                else:
+                    self.payload     = self.payloads[id]
                 self.plFullstate = self.payload.plFullState[::self.sample, :]            
             self.initializeQuad()
             x, y, z, q                   = self.getCurrState(i)
@@ -458,14 +480,14 @@ class PlotandAnimate:
                 xl, yl, zl  = self.getPayloadStates(i)
                 self.drawPayload(x[i], y[i], z[i], xl[i], yl[i], zl[i])
                 # self.drawPlTraj(xl, yl, zl)
-                r = 1e-1
+                r = 0.08
                 xsp, ysp, zsp = Sphere(xl, yl, zl, r)
                 self.ax.plot_surface(xl[i]+xsp, yl[i]+ysp, zl[i]+zsp, cmap=plt.cm.YlGnBu_r)
             self.drawQuivers(x[i],y[i],z[i], q, xref[i], yref[i], zref[i])
             self.drawActvsRefTraj(x, y, z, xref, yref, zref)
             self.drawQuadrotorArms(x[i], y[i], z[i], armI1, armI2, _armI1, _armI2)
 
-            Xb,Yb,Zb = RotatedCylinder(0,0,0.1,0.1,q) 
+            Xb,Yb,Zb = RotatedCylinder(0,0,0.05,0.1,q) 
             self.drawPropellers(Xb, Yb, Zb,armI1, armI2, _armI1, _armI2)
         
         return self.line, 

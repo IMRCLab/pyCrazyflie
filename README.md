@@ -17,27 +17,19 @@ Add _cffirmware-firmware/_ to your `PYTHONPATH`. Open a terminal in the `pyCrazy
       *.csv file format
         rows: time, xd, yd, zd, vxd, vyd, vzd, axd, ayd, azd
     ```
+### Initialization
+* [ ] The `config/initialize.yaml` sets the all the required initialization for each robot (e.g., path for the trajectory of each robot, initial conditions, dynamic parameters, etc...)
 ### Main File: `controller.py`
-* [ ] To run the simulator, open the terminal in `pyCrazyflie/` directory and type 
+* [ ] To run the simulator, open the terminal in `pyCrazyflie/` directory and type the following command, providing an argument as the name of the pdf and video file that will be created after he simulation finishes running (i.e., choose a name for the file instead `name_of_the_file` )
   ```bash
-    python3 controller.py trajectorycsv/infinity8.csv 
+    python3 controller.py name_of_the_file
     ```    
+    
 * [ ] In order to animate the simulation in a *.gif* format or save the generated plots in a pdf type this command
     ```bash
-    python3 controller.py trajectorycsv/infinity8.csv --animate --plotSave
+    python3 controller.py name_of_the_file --animate --plotSave
     ``` 
 * [ ] `--animate` and `--savePlot` are flags. Their defaults are both False. 
-* [ ] For the frequency of the frames to be shown in the plotting (and similar for the video), change the *sample* variable inside `controller.py` main function. 
-* [ ] Finally, the initial state of the UAV  and the time step _dt_ are intialized in the following function
-```python
-  def initializeState():
-    """This function sets the initial states of the UAV
-        dt: time step
-        initPose: initial position [x,y,z]
-        initq: initial rotations represented in quaternions 
-        initLinVel: [xdot, ydot, zdot] initial linear velocities
-        initAngVel: [wx, wy, wz] initial angular velocities"""
-```
-___
-## Expected Output in Vidoes/ Directory
+* [ ] The animation will be saved in the `Videos` Directory, while the pdf will be saved in the main `pyCrazyflie` directory.
+## Expected Output in Vidoes Directory
 ![Markdown Logo](Videos/infinity8.gif)
