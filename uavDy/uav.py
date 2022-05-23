@@ -127,7 +127,8 @@ class SharedPayload:
     def getBq(self, uavs_params):
         Bq = np.zeros((self.sys_dim, self.sys_dim))
         Bq[0:3,0:3] = self.mt*np.identity(3)
-        Bq[3:6,3:6] = self.J_bar
+        if not self.pointmass:
+            Bq[3:6,3:6] = self.J_bar
         i = self.plSysDim
         k = self.plStateSize
         for name, uav in uavs_params.items():
@@ -169,14 +170,16 @@ class SharedPayload:
             qi = self.state[k:k+3]
             wi = self.state[k+3*self.numOfquads:k+3+3*self.numOfquads]
             k+=3
-            Nq[0:3]  += (m*R_p @ skew(wl) @skew(wl) @ posFrload + m*l*np.linalg.norm(wi)*qi)
-            Nq[3:6]  += m*l*skew(posFrload) @ np.transpose(R_p)*np.linalg.norm(wi) @ qi
-            term     += skew(posFrload)@ np.transpose(R_p) @  self.grav_
+            Nq[0:3]  += (m*R_p @ skew(wl) @skew(wl) @ posFrload + m*l*(np.linalg.norm(wi))**2*qi)
+            if not self.pointmass:
+                Nq[3:6]  += m*l*skew(posFrload) @ np.transpose(R_p)*(np.linalg.norm(wi))**2 @ qi
+                term     += skew(posFrload)@ np.transpose(R_p) @  np.array([0,0,-m*self.g])
             Nq[i:i+3] = m*l*skew(qi) @ R_p @ skew(wl) @skew(wl) @ posFrload  \
-                      - l*skew(qi) @ self.grav_ 
+                      - l*skew(qi) @ np.array([0,0,-m*self.g])
             i+=3
         Nq[0:3] = -Nq[0:3] + self.grav_
-        Nq[3:6] = -skew(wl)@self.J_bar@wl - Nq[3:6] + term
+        if not self.pointmass:
+            Nq[3:6] = -skew(wl)@self.J_bar@wl - Nq[3:6] + term
         return Nq
 
     def getuinp(self, uavs_params):
@@ -197,7 +200,8 @@ class SharedPayload:
             wi = self.state[k+3*self.numOfquads:k+3+3*self.numOfquads]
             k+=3
             u_inp[0:3]   += self.ctrlInp[i,:]
-            u_inp[3:6]   += skew(posFrload)@np.transpose(R_p) @ self.ctrlInp[i,:]
+            if not self.pointmass:
+                u_inp[3:6]   += skew(posFrload)@np.transpose(R_p) @ self.ctrlInp[i,:]
             u_inp[j:j+3]  = - l*skew(qi) @ self.ctrlInp[i,:]
             i+=1
             j+=3
@@ -266,7 +270,7 @@ class SharedPayload:
         Bq    = self.getBq(uavs_params)
         Nq    = self.getNq(uavs_params)
         u_inp = self.getuinp(uavs_params)
-        accl = np.linalg.inv(Bq)@(Nq + u_inp)
+        accl = np.linalg.pinv(Bq)@(Nq + u_inp)
         velNext, posNext = self.getNextState(accl)
         
         self.state[0:3]   = posNext[0:3]
@@ -282,18 +286,21 @@ class SharedPayload:
         for i in range(0, self.numOfquads):
             if not self.pointmass:
                 self.state[k:k+3] = posNext[j+1:j+4]
+                self.state[k+1+3*self.numOfquads:k+4+3*self.numOfquads] = velNext[j:j+3]
                 self.plstate[0,k:k+3] = self.state[k:k+3]
+                self.plstate[0,k+1+3*self.numOfquads:k+4+3*self.numOfquads] = velNext[j:j+3]
 
             else:
                 self.state[k:k+3] = posNext[j:j+3]
-            self.state[k+3*self.numOfquads:k+3+3*self.numOfquads] = velNext[j:j+3]
-            self.plstate[0,k+3*self.numOfquads:k+3+3*self.numOfquads] = velNext[j:j+3]
+                self.plstate[0,k:k+3] = self.state[k:k+3]
+                self.state[k+3*self.numOfquads:k+3+3*self.numOfquads] = velNext[j:j+3]
+                self.plstate[0,k+3*self.numOfquads:k+3+3*self.numOfquads] = velNext[j:j+3]
 
             k+=3
             j+=3
         m = 0
         for id in uavs.keys():
-            tau    = control_inps[m,1:].reshape(3,)
+            tau    = control_inps[m,1::].reshape(3,)
             curr_q = uavs[id].state[6:10]
             curr_w = uavs[id].state[10::]
             qNext, wNext = uavs[id].getNextAngularState(curr_w, curr_q, tau)

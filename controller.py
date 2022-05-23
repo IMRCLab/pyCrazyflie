@@ -281,6 +281,7 @@ def setTeamParams(params, initUavs):
             uavs['uav_'+name] = uav1
         payload_params, payload = setPayloadfromUAVs(uavs_params, payload_params)
     return plStSize, uavs, uavs_params, payload, trajectories
+
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##        
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##
 def main(filename, initUavs, animateOrPlotdict, params):
@@ -305,7 +306,7 @@ def main(filename, initUavs, animateOrPlotdict, params):
         timeStamped_traj[id] = np.loadtxt(input, delimiter=',') 
         tf_ms = timeStamped_traj[id][0,-1]*1e3
     # Simulation time
-    tf_sim = tf_ms + 0.5e3
+    tf_sim = tf_ms+ 0.5e3
       # final time of traj in ms
     print('\nTotal trajectory time: '+str(tf_sim*1e-3)+ 's')
     print('Simulating...')
@@ -335,8 +336,7 @@ def main(filename, initUavs, animateOrPlotdict, params):
                 ctrlInp     = control_inp[0]*rn.to_matrix(uavs[id].state[6:10]) @ np.array([0,0,1])
                               
                 payload.stackCtrl(ctrlInp.reshape(1,3))
-
-                uavs[id].state = StatefromSharedPayload(payload, fullState[6::], uavs[id].lc, j)
+                uavs[id].state = StatefromSharedPayload(payload, uavs[id].state[6::], uavs[id].lc, j)
                 uavs[id].stackStandCtrl(uavs[id].state, control_inp, ref_state)
                 j +=3
             payload.cursorUp() 
