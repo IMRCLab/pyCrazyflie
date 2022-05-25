@@ -345,8 +345,11 @@ class PlotandAnimate:
         self.vec2d = self.ax.quiver([],[],[],[],[],[])
         self.vec3d = self.ax.quiver([],[],[],[],[],[])
         #Create the arms of the quadrotor in the body frame
-        self.armb1  = np.array([[self.uavModel.d*10**(1.7)*np.cos(0)], [self.uavModel.d*10**(1.7)*np.sin(0)] ,[0]])
-        self._armb1 = np.array([[-self.uavModel.d*10**(1.7)*np.cos(0)], [-self.uavModel.d*10**(1.7)*np.sin(0)] ,[0]])
+        # self.armb1  = np.array([[self.uavModel.d*10**(1.7)*np.cos(0)], [self.uavModel.d*10**(1.7)*np.sin(0)] ,[0]])
+        # self._armb1 = np.array([[-self.uavModel.d*10**(1.7)*np.cos(0)], [-self.uavModel.d*10**(1.7)*np.sin(0)] ,[0]])
+        self.armb1  = np.array([[self.uavModel.d*np.cos(0)], [self.uavModel.d*np.sin(0)] ,[0]])
+        self._armb1 = np.array([[-self.uavModel.d*np.cos(0)], [-self.uavModel.d*np.sin(0)] ,[0]])
+        
         q90z        = rn.from_euler(0, 0, np.radians(90),convention='xyz')
         rot90z      = rn.to_matrix(q90z)
         self.armb2  = rot90z @ (self.armb1.reshape(3,))
@@ -360,7 +363,7 @@ class PlotandAnimate:
     def setlimits(self):
         # This method finds the maximum value in the x-y-z actual states for the UAV(s) and sets the limits of the figure accordingly   
         # edge: adds extra space for the figure 
-        edge = 0.05
+        edge = 1
         maxs_  = []
         for uav in self.uavModels.values():
             max_x = max(uav.fullState[:,0])
@@ -487,7 +490,7 @@ class PlotandAnimate:
             self.drawActvsRefTraj(x, y, z, xref, yref, zref)
             self.drawQuadrotorArms(x[i], y[i], z[i], armI1, armI2, _armI1, _armI2)
 
-            Xb,Yb,Zb = RotatedCylinder(0,0,0.05,0.1,q) 
+            Xb,Yb,Zb = RotatedCylinder(0,0,0.1,0.1,q) 
             self.drawPropellers(Xb, Yb, Zb,armI1, armI2, _armI1, _armI2)
         
         return self.line, 

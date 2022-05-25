@@ -270,7 +270,7 @@ class SharedPayload:
         Bq    = self.getBq(uavs_params)
         Nq    = self.getNq(uavs_params)
         u_inp = self.getuinp(uavs_params)
-        accl = np.linalg.pinv(Bq)@(Nq + u_inp)
+        accl = np.linalg.inv(Bq)@(Nq + u_inp)
         velNext, posNext = self.getNextState(accl)
         
         self.state[0:3]   = posNext[0:3]
@@ -331,7 +331,7 @@ class UavModel:
             ### state = [x, y, z, xdot, ydot, zdot, qw, qx, qy, qz, wx, wy, wz]
         self.state = state
         self.dt    = dt
-
+        self.controller = uav_params['controller']
         self.fullState = np.empty((1,13))
         self.ctrlInps  = np.empty((1,8))
         self.refState  = np.empty((1,6))

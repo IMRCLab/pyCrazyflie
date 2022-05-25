@@ -12,9 +12,12 @@ import sys
 np.set_printoptions(linewidth=np.inf)
 np.set_printoptions(suppress=True)
 
-def initController():
+def initController(controller):
     """This function initializes the controller"""
-    cffirmware.controllerSJCInit()
+    if controller['name'] in 'lee':
+        cffirmware.controllerLeeInit()
+    else:
+        cffirmware.controllerSJCInit()
     # Allocate output variable
     # For this example, only thrustSI, and torque members are relevant
     control = cffirmware.control_t()
@@ -46,7 +49,7 @@ def updateDesState(setpoint, fulltraj):
     setpoint.acceleration.x = fulltraj[6]  # m/s^2
     setpoint.acceleration.y = fulltraj[7]  # m/s^2
     setpoint.acceleration.z = fulltraj[8]  # m/s^2
-    # setpoint.attitude.yaw = 0  # deg
+    setpoint.attitude.yaw = 0  # deg
     return setpoint
     
 def updateSensor(sensors, uav):
@@ -187,6 +190,7 @@ def setParams(params):
     uavs, payloads, trajectories  = {}, {}, {}
     
     for name, robot in params['Robots'].items():
+        print(robot['refTrajPath'])
         trajectories['uav_'+name]   = robot['refTrajPath']
         if robot['payload']['mode'] in 'enabled':
             payload_params          = {**robot['payload'], **robot['initConditions'], 'm':robot['m'], 'dt':dt}
@@ -306,18 +310,18 @@ def main(filename, initUavs, animateOrPlotdict, params):
         timeStamped_traj[id] = np.loadtxt(input, delimiter=',') 
         tf_ms = timeStamped_traj[id][0,-1]*1e3
     # Simulation time
-    tf_sim = tf_ms+ 0.5e3
+    tf_sim = tf_ms + 0.5e3
       # final time of traj in ms
     print('\nTotal trajectory time: '+str(tf_sim*1e-3)+ 's')
     print('Simulating...')
-    control, setpoint, sensors, state = initController()
+   
     
     if params['RobotswithPayload']['payload']['mode'] in 'shared':
         for tick in range(0, int(tf_sim)+1):
-            quadNum = 0
             j = plStSize
             ctrlStack = np.empty((1,4))
             for id in uavs.keys():
+                control, setpoint, sensors, state = initController(uavs[id].controller)
             #initialize the controller and allocate current state (both sensor and state are the state)
             # This is kind of odd and should be part of state
                 if tick <= int(tf_ms):    
@@ -329,9 +333,13 @@ def main(filename, initUavs, animateOrPlotdict, params):
                  # update current state
                 state, fullState = updateState(state, uavs[id])
                 sensors          = updateSensor(sensors, uavs[id])
-                cffirmware.controllerSJC(control, setpoint, sensors, state, tick)
-
+                if uavs[id].controller['name'] in 'lee':
+                    control = cffirmware.controllerLee(uavs[id], control, setpoint, sensors, state, tick)        
+                else:    
+                    cffirmware.controllerSJC(control, setpoint, sensors, state, tick)
+               
                 control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
+                print('control extras: ', control.thrustSI)
                 ctrlStack   = np.vstack((ctrlStack, control_inp.reshape(1,4)))
                 ctrlInp     = control_inp[0]*rn.to_matrix(uavs[id].state[6:10]) @ np.array([0,0,1])
                               
@@ -351,7 +359,7 @@ def main(filename, initUavs, animateOrPlotdict, params):
         for id, uav_ in uavs.items():
             #initialize the controller and allocate current state (both sensor and state are the state)
             # This is kind of odd and should be part of state
-            control, setpoint, sensors, state = initController()
+            control, setpoint, sensors, state = initController(uavs[id].controller)
             # Note that 1 tick == 1ms
             # note that the attitude controller will only compute a new output at 500 Hz
             # and the position controller only at 100 Hz
@@ -371,10 +379,12 @@ def main(filename, initUavs, animateOrPlotdict, params):
                 state,fullState = updateState(state, uav_)
                 sensors         = updateSensor(sensors, uav_)
                 # query the controller
-                cffirmware.controllerSJC(control, setpoint, sensors, state, tick)
-                # states evolution
+                if uavs[id].controller['name'] in 'lee':
+                    control  = cffirmware.controllerLee(uavs[id], control, setpoint, sensors, state, tick)        
+                else:    
+                    cffirmware.controllerSJC(control, setpoint, sensors, state, tick)                # states evolution
                 control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
-
+                # print(control_inp)
                 if uav_.pload:
                     payload.PL_nextState(control_inp, uav_)
                     uav_.state = StQuadfromPL(payload)
