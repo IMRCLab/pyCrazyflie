@@ -38,7 +38,7 @@ def setTrajmode(setpoint):
     setpoint.mode.yaw = cffirmware.modeDisable
     return setpoint
 
-def updateDesState(setpoint, fulltraj):
+def updateDesState(setpoint,controller, fulltraj):
     """This function updates the desired states"""
     setpoint.position.x = fulltraj[0]  # m
     setpoint.position.y = fulltraj[1]  # m
@@ -49,6 +49,13 @@ def updateDesState(setpoint, fulltraj):
     setpoint.acceleration.x = fulltraj[6]  # m/s^2
     setpoint.acceleration.y = fulltraj[7]  # m/s^2
     setpoint.acceleration.z = fulltraj[8]  # m/s^2
+    if controller['name'] in 'lee':
+        setpoint.jerk.x = fulltraj[9]
+        setpoint.jerk.y = fulltraj[10]
+        setpoint.jerk.z = fulltraj[11]
+        setpoint.snap.x = fulltraj[12]
+        setpoint.snap.y = fulltraj[13]
+        setpoint.snap.z = fulltraj[14]
     setpoint.attitude.yaw = 0  # deg
     return setpoint
     
@@ -190,7 +197,6 @@ def setParams(params):
     uavs, payloads, trajectories  = {}, {}, {}
     
     for name, robot in params['Robots'].items():
-        print(robot['refTrajPath'])
         trajectories['uav_'+name]   = robot['refTrajPath']
         if robot['payload']['mode'] in 'enabled':
             payload_params          = {**robot['payload'], **robot['initConditions'], 'm':robot['m'], 'dt':dt}
@@ -213,8 +219,10 @@ def StatefromSharedPayload(payload, angState, lc, j):
     wi = payload.state[j+3*payload.numOfquads:j+3+3*payload.numOfquads]
     uavState =  np.zeros((13,))
     posq =  payload.state[0:3] - lc * qi
+    # print(payload.state[0:3], posq, qi)
     pdot = np.cross(wi, qi)
     velq = payload.state[3:6] - lc * pdot
+    # print(velq,payload.state[3:6])
     uavState[0:3]  = posq
     uavState[3:6]  = velq
     uavState[6:10] = angState[0:4]
@@ -237,10 +245,6 @@ def setPayloadfromUAVs(uavs_params, payload_params):
         qdot = np.array(params['qd'])
         initPos  = posq + lc * q
         initLinV = vq + lc * qdot
-        print('q: ',q) 
-        print('pload init pos: ',initPos)
-        # print('pos init of quad: ', posq)
-        # print('pload init vel: ',initLinV)
     payload_params.update({'init_pos_L': initPos, 'init_linV_L': initLinV})
     return payload_params, uav.SharedPayload(payload_params, uavs_params)
     pass
@@ -310,43 +314,45 @@ def main(filename, initUavs, animateOrPlotdict, params):
         timeStamped_traj[id] = np.loadtxt(input, delimiter=',') 
         tf_ms = timeStamped_traj[id][0,-1]*1e3
     # Simulation time
-    tf_sim = tf_ms + 0.5e3
+    tf_sim = tf_ms + 5.1e3
       # final time of traj in ms
     print('\nTotal trajectory time: '+str(tf_sim*1e-3)+ 's')
     print('Simulating...')
    
     
-    if params['RobotswithPayload']['payload']['mode'] in 'shared':
+    if shared:
         for tick in range(0, int(tf_sim)+1):
             j = plStSize
             ctrlStack = np.empty((1,4))
             for id in uavs.keys():
                 control, setpoint, sensors, state = initController(uavs[id].controller)
-            #initialize the controller and allocate current state (both sensor and state are the state)
-            # This is kind of odd and should be part of state
+                #initialize the controller and allocate current state (both sensor and state are the state)
+                # This is kind of odd and should be part of state
                 if tick <= int(tf_ms):    
-                    setpoint  = updateDesState(setpoint, timeStamped_traj[id][1::,tick])
-                    ref_state =  timeStamped_traj[id][1:7,tick]
+                    setpoint  = updateDesState(setpoint, uavs[id].controller, timeStamped_traj[id][1::,tick])
+                    ref_state =  np.array(timeStamped_traj[id][1:7,tick])
                 else:
-                    setpoint  = updateDesState(setpoint, timeStamped_traj[id][1::,-1])
-                    ref_state = timeStamped_traj[id][1:7,-1]
+                    setpoint  = updateDesState(setpoint, uavs[id].controller, timeStamped_traj[id][1::,-1])
+                    ref_state = np.array(timeStamped_traj[id][1:7,-1])
                  # update current state
                 state, fullState = updateState(state, uavs[id])
                 sensors          = updateSensor(sensors, uavs[id])
                 if uavs[id].controller['name'] in 'lee':
-                    control = cffirmware.controllerLee(uavs[id], control, setpoint, sensors, state, tick)        
+                    control, des_w, des_wd  = cffirmware.controllerLee(uavs[id], control, setpoint, sensors, state, tick)
+                    ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)               
                 else:    
-                    cffirmware.controllerSJC(control, setpoint, sensors, state, tick)
+                    cffirmware.controllerSJC(control, setpoint, sensors, state, 0)
                
                 control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
-                print('control extras: ', control.thrustSI)
                 ctrlStack   = np.vstack((ctrlStack, control_inp.reshape(1,4)))
                 ctrlInp     = control_inp[0]*rn.to_matrix(uavs[id].state[6:10]) @ np.array([0,0,1])
-                              
-                payload.stackCtrl(ctrlInp.reshape(1,3))
+            
                 uavs[id].state = StatefromSharedPayload(payload, uavs[id].state[6::], uavs[id].lc, j)
                 uavs[id].stackStandCtrl(uavs[id].state, control_inp, ref_state)
                 j +=3
+            
+                payload.stackCtrl(ctrlInp.reshape(1,3))
+            
             payload.cursorUp() 
             uavs, loadState =  payload.stateEvolution(ctrlStack, uavs, uavs_params)
             payload.stackState()
@@ -356,7 +362,7 @@ def main(filename, initUavs, animateOrPlotdict, params):
         animateOrPlot(uavs, payload, animateOrPlotdict, filename, tf_sim, shared)
 
     else:
-        for id, uav_ in uavs.items():
+        for id in uavs.keys():
             #initialize the controller and allocate current state (both sensor and state are the state)
             # This is kind of odd and should be part of state
             control, setpoint, sensors, state = initController(uavs[id].controller)
@@ -364,38 +370,38 @@ def main(filename, initUavs, animateOrPlotdict, params):
             # note that the attitude controller will only compute a new output at 500 Hz
             # and the position controller only at 100 Hz
             # If you want an output always, simply select tick==0
-            if uav_.pload:
+            if uavs[id].pload:
                 payload = payloads[id]
             
             for tick in range(0, int(tf_sim)+1):
                 # update desired state
                 if tick <= int(tf_ms):    
-                    setpoint  = updateDesState(setpoint, timeStamped_traj[id][1::,tick])
-                    ref_state =  timeStamped_traj[id][1:7,tick]
+                    setpoint  = updateDesState(setpoint, uavs[id].controller, timeStamped_traj[id][1::,tick])
+                    ref_state =  np.array(timeStamped_traj[id][1:7,tick])
+                    
                 else:
-                    setpoint  = updateDesState(setpoint, timeStamped_traj[id][1::,-1])
-                    ref_state = timeStamped_traj[id][1:7,-1]
+                    setpoint  = updateDesState(setpoint, uavs[id].controller, timeStamped_traj[id][1::,-1])
+                    ref_state = np.array(timeStamped_traj[id][1:7,-1])
                 # update current state
-                state,fullState = updateState(state, uav_)
-                sensors         = updateSensor(sensors, uav_)
+                state,fullState = updateState(state, uavs[id])
+                sensors         = updateSensor(sensors, uavs[id])
                 # query the controller
                 if uavs[id].controller['name'] in 'lee':
-                    control  = cffirmware.controllerLee(uavs[id], control, setpoint, sensors, state, tick)        
+                    control, des_w, des_wd  = cffirmware.controllerLee(uavs[id], control, setpoint, sensors, state, tick)     
+                    ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)     
                 else:    
                     cffirmware.controllerSJC(control, setpoint, sensors, state, tick)                # states evolution
                 control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
-                # print(control_inp)
-                if uav_.pload:
-                    payload.PL_nextState(control_inp, uav_)
-                    uav_.state = StQuadfromPL(payload)
+                if uavs[id].pload:
+                    payloads[id].PL_nextState(control_inp, uavs[id])
+                    uavs[id].state = StQuadfromPL(payloads[id])
                 else:
-                    uav_.states_evolution(control_inp)
-                uav_.stackStandCtrl(uav_.state, control_inp, ref_state)    
-            uav_.cursorUp()
-            uavs[id] = uav_
-            if uav_.pload:
-                payload.cursorUp()
-                payloads[id] = payload
+                    uavs[id].states_evolution(control_inp)
+                uavs[id].stackStandCtrl(uavs[id].state, control_inp, ref_state)    
+            uavs[id].cursorUp()
+            if uavs[id].pload:
+                payloads[id].cursorUp()
+                
         # Animation        
         animateOrPlot(uavs, payloads, animateOrPlotdict, filename, tf_sim, shared)    
 

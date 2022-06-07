@@ -17,7 +17,7 @@ def create_subtitle(fig: plt.Figure, grid: SubplotSpec, title: str):
 def setlimits(ax, full_state):
     # This method finds the maximum value in the x-y-z actual states and sets the limits of the figure accordingly   
     # edge: adds extra space for the figure 
-    edge  = 0.9
+    edge  = 0.4
     max_x = max(full_state[:,0])
     max_y = max(full_state[:,1])
     max_z = max(full_state[:,2])
@@ -157,7 +157,7 @@ def outputPlots(uavs, payloads, savePlot, tf_sim, pdfName, shared):
         if shared:
             payload = payloads 
         elif uav_.pload:
-            payload     = payloads[id]
+            payload  = payloads[id]
             
         plt.rcParams['axes.grid'] = True
         plt.rcParams['figure.max_open_warning'] = 100
@@ -177,6 +177,9 @@ def outputPlots(uavs, payloads, savePlot, tf_sim, pdfName, shared):
         fig5 = plt.figure(constrained_layout=True)
         gs = GridSpec(3, 2, figure=fig5)
 
+        fig13, ax13 = plt.subplots(3, 1, sharex=True ,sharey=True)
+        fig13.tight_layout() 
+
         ax5 = fig5.add_subplot(gs[:, 0])
         ax6 = fig5.add_subplot(gs[0,1])
         ax7 = fig5.add_subplot(gs[1,1],sharey=ax6)
@@ -189,10 +192,14 @@ def outputPlots(uavs, payloads, savePlot, tf_sim, pdfName, shared):
         time   = np.linspace(0, tf_sim*1e-3, num=len(full_state)) 
         pos    = full_state[:,0:3]
         linVel = full_state[:,3:6]
-        angVel = full_state[:,10::]
+        angVel = full_state[:,10:13]
     
         posdes    = ref_state[:,0:3]
-        linVeldes = ref_state[:,3::]
+        linVeldes = ref_state[:,3:6]
+        if uav_.controller['name'] in 'lee':
+            angVeldes = ref_state[:,6:9]
+            angAccdes = ref_state[:,9:12]
+            angAcc    = full_state[:, 13::]
         ts = 'time [s]'
     
         poserr  = (posdes[:,:] - pos[:,:]).reshape(len(full_state),3)
@@ -222,22 +229,38 @@ def outputPlots(uavs, payloads, savePlot, tf_sim, pdfName, shared):
 
         ###################################
 
-        ax3[0].plot(time, angVel[:,0],c='k',lw=1)
-        ax3[1].plot(time, angVel[:,1],c='k',lw=1)
-        ax3[2].plot(time, angVel[:,2],c='k',lw=1)
-        ax3[0].set_ylabel('wx [deg/s]',labelpad=-5), ax3[1].set_ylabel('wy [deg/s]',labelpad=-5), ax3[2].set_ylabel('wz [deg/s]',labelpad=-5)
+        ax3[0].plot(time, angVel[:,0],c='k',lw=0.75,label='Actual')
+        ax3[1].plot(time, angVel[:,1],c='k',lw=0.75,label='Actual')
+        ax3[2].plot(time, angVel[:,2],c='k',lw=0.75,label='Actual')
+        if uav_.controller['name'] in 'lee':
+            ax3[0].plot(time, angVeldes[:,0],lw=0.75, c='darkgreen',label='Reference')
+            ax3[1].plot(time, angVeldes[:,1],lw=0.75, c='darkgreen',label='Reference')
+            ax3[2].plot(time, angVeldes[:,2],lw=0.75, c='darkgreen',label='Reference')
+
+        ax3[0].set_ylabel('wx [deg/s]',labelpad=-2), ax3[1].set_ylabel('wy [deg/s]',labelpad=-2), ax3[2].set_ylabel('wz [deg/s]',labelpad=-2)
         fig3.supxlabel(ts,fontsize='small')
 
         grid = plt.GridSpec(3,1)
-        create_subtitle(fig3, grid[0, ::], 'Actual Angular Velocities')
+        create_subtitle(fig3, grid[0, ::], 'Actual vs Reference Angular Velocities')
 
         ###################################
+        if uav_.controller['name'] in 'lee':
+            ax13[0].plot(time, angAcc[:,0],c='k',lw=0.75,label='Actual'), ax13[0].plot(time, angAccdes[:,0],lw=0.75, c='darkgreen',label='Reference')
+            ax13[1].plot(time, angAcc[:,1],c='k',lw=0.75,label='Actual'), ax13[1].plot(time, angAccdes[:,1],lw=0.75, c='darkgreen',label='Reference')
+            ax13[2].plot(time, angAcc[:,2],c='k',lw=0.75,label='Actual'), ax13[2].plot(time, angAccdes[:,2],lw=0.75, c='darkgreen',label='Reference')
+            ax13[0].set_ylabel('wdx [deg/s]',labelpad=-2), ax13[1].set_ylabel('wdy [deg/s]',labelpad=-2), ax13[2].set_ylabel('wdz [deg/s]',labelpad=-2)
+            fig13.supxlabel(ts,fontsize='small')
 
+            grid = plt.GridSpec(3,1)
+            create_subtitle(fig13, grid[0, ::], 'Actual vs Reference Angular Accelerations')
+
+
+        ###################################
         ax4[0,0].plot(time, poserr[:,0],c='r',lw=0.7), ax4[0,1].plot(time, poserr[:,1],c='r',lw=0.7), ax4[0,2].plot(time, poserr[:,2],c='r',lw=0.7)
         ax4[0,0].set_ylabel('ex [m/s]'), ax4[0,1].set_ylabel('ey [m/s]'), ax4[0,2].set_ylabel('ez [m/s]')
         
         ax4[1,0].plot(time, linVerr[:,0],c='r',lw=0.7), ax4[1,1].plot(time, linVerr[:,1],c='r',lw=0.7), ax4[1,2].plot(time, linVerr[:,2],c='r',lw=0.7)
-        ax4[1,0].set_ylabel('vex des [m/s]'), ax4[1,1].set_ylabel('vey des [m/s]'), ax4[1,2].set_ylabel('vez des [m/s]')
+        ax4[1,0].set_ylabel('vex [m/s]'), ax4[1,1].set_ylabel('vey [m/s]'), ax4[1,2].set_ylabel('vez [m/s]')
         fig4.supxlabel(ts,fontsize='small')
 
         grid = plt.GridSpec(2,3)
@@ -282,6 +305,8 @@ def outputPlots(uavs, payloads, savePlot, tf_sim, pdfName, shared):
             fig1.savefig(f, format='pdf', bbox_inches='tight')
             fig2.savefig(f, format='pdf', bbox_inches='tight')
             fig3.savefig(f, format='pdf', bbox_inches='tight')
+            if uav_.controller['name'] in 'lee':
+                fig13.savefig(f, format='pdf', bbox_inches='tight')
             fig4.savefig(f, format='pdf', bbox_inches='tight')  
             fig5.savefig(f, format='pdf', bbox_inches='tight')  
             fig6.savefig(f, format='pdf', bbox_inches='tight')
@@ -292,6 +317,8 @@ def outputPlots(uavs, payloads, savePlot, tf_sim, pdfName, shared):
                 fig10.savefig(f, format='pdf', bbox_inches='tight')
                 fig11.savefig(f, format='pdf', bbox_inches='tight')
                 fig12.savefig(f, format='pdf', bbox_inches='tight')
+            
+                
 
     f.close()
 
@@ -363,7 +390,8 @@ class PlotandAnimate:
     def setlimits(self):
         # This method finds the maximum value in the x-y-z actual states for the UAV(s) and sets the limits of the figure accordingly   
         # edge: adds extra space for the figure 
-        edge = 1
+        edge_ = -2
+        edge  = 2
         maxs_  = []
         for uav in self.uavModels.values():
             max_x = max(uav.fullState[:,0])
@@ -378,13 +406,13 @@ class PlotandAnimate:
             maxs_.append(max_)
 
         max_ = max(maxs_)
-
-        self.ax.set_xlim3d([-max_-edge, max_+edge])
-        self.ax.set_ylim3d([-max_-edge, max_+edge])
-        self.ax.set_zlim3d([-max_-edge, max_+edge])
-        self.ax.set_xlim3d([-max_-edge, max_+edge])
-        self.ax.set_ylim3d([-max_-edge, max_+edge])
-        self.ax.set_zlim3d([-max_-edge, max_+edge])
+    
+        self.ax.set_xlim3d([-max_+edge_, max_+edge])
+        self.ax.set_ylim3d([-max_+edge_, max_+edge])
+        self.ax.set_zlim3d([-max_+edge_, max_+edge])
+        self.ax.set_xlim3d([-max_+edge_, max_+edge])
+        self.ax.set_ylim3d([-max_+edge_, max_+edge])
+        self.ax.set_zlim3d([-max_+edge_, max_+edge])
         self.ax.set_xlabel('X')
         self.ax.set_ylabel('Y')
         self.ax.set_zlabel('Z')

@@ -30,8 +30,8 @@ class Payload:
 
     def getPL_nextpos(self, fz, curr_posl, curr_vl, curr_p, curr_wl, curr_q):
         R_IB  = to_matrix(curr_q)
-        pd    = skew(curr_wl) @ curr_p
-        al    =  (1/self.mt) * (self.grav_ + (np.vdot(curr_p, R_IB @ np.array([0,0,fz])) - (self.m * self.lc * (np.vdot(pd, pd)))) * curr_p)
+        pd    = np.cross(curr_wl, curr_p)
+        al    =   (((np.dot(curr_p, fz*R_IB @ np.array([0,0,1])) - (self.m * self.lc * (np.dot(pd, pd)))) * curr_p)/self.mt) - np.array([0,0,9.81])
         Vl_   = al * self.dt + curr_vl
         posl_ = curr_vl * self.dt + curr_posl
         return posl_, Vl_
@@ -39,14 +39,14 @@ class Payload:
 
     def getPLAngularState(self, fz, curr_q, curr_p, curr_wl):
         R_IB = to_matrix(curr_q)
-        wld  = (1/(self.lc*self.m)) * ( skew(-curr_p) @ R_IB @ np.array([0,0,fz]))
+        u = fz*R_IB @ np.array([0,0,1])
+        wld  = (1/(self.lc*self.m)) * (-np.cross(curr_p, u))
         wl_  = wld * self.dt + curr_wl
-        pd    =  skew(curr_wl) @ curr_p
+        pd    =  np.cross(curr_wl, curr_p)
         p_    = pd*self.dt + curr_p
         return p_, wl_
 
     def PL_nextState(self, tau_inp, uav):
-                    
         curr_posl = self.state[0:3]   # position: x,y,z
         curr_vl   = self.state[3:6]   # linear velocity: xdot, ydot, zdot
         curr_p    = self.state[6:9]   # directional unit vector
@@ -127,6 +127,8 @@ class SharedPayload:
     def getBq(self, uavs_params):
         Bq = np.zeros((self.sys_dim, self.sys_dim))
         Bq[0:3,0:3] = self.mt*np.identity(3)
+        ones = np.ones((3,3))
+
         if not self.pointmass:
             Bq[3:6,3:6] = self.J_bar
         i = self.plSysDim
@@ -141,15 +143,16 @@ class SharedPayload:
                 R_p = to_matrix(self.state[6:10])
             else: 
                 R_p = np.identity(3)
-            Bq[0:3, 3:6]  += -m * R_p @ skew(np.array(posFrload))
-            Bq[3:6,0:3]   +=  m * skew(np.array(posFrload)) @ np.transpose(R_p) 
             Bq[0:3, i:i+3] = m*l*skew(qi)
-            Bq[i:i+3,0:3]  = -Bq[0:3,i:i+3]
-            
-            Bq[i:i+3, 3:6] = m*l*skew(qi) @ R_p @ skew(np.array(posFrload))
-            Bq[3:6, i:i+3] = m*l*skew(np.array(posFrload)) @ np.transpose(R_p) @ skew(qi)
-            Bq[i:i+3, i:i+3] = m*l**2*np.identity(3)
+            Bq[i:i+3,0:3]  = -m*l*skew(qi)
+            Bq[i:i+3, i:i+3] = m*(l**2)*np.identity(3)
+            if not self.pointmass:
+                Bq[0:3, 3:6]  += -m * R_p @ skew(np.array(posFrload))
+                Bq[3:6,0:3]   +=  m * skew(np.array(posFrload)) @ np.transpose(R_p) 
+                Bq[i:i+3, 3:6] = m*l*skew(qi) @ R_p @ skew(np.array(posFrload))
+                Bq[3:6, i:i+3] = m*l*skew(np.array(posFrload)) @ np.transpose(R_p) @ skew(qi)
             i+=3
+
         return Bq
 
     def getNq(self, uavs_params):
@@ -170,20 +173,20 @@ class SharedPayload:
             qi = self.state[k:k+3]
             wi = self.state[k+3*self.numOfquads:k+3+3*self.numOfquads]
             k+=3
-            Nq[0:3]  += (m*R_p @ skew(wl) @skew(wl) @ posFrload + m*l*(np.linalg.norm(wi))**2*qi)
+            Nq[0:3]  +=  m*l*(np.linalg.norm(wi))**2*qi
             if not self.pointmass:
+                Nq[0:3]  += m*R_p @ skew(wl) @skew(wl) @ posFrload
                 Nq[3:6]  += m*l*skew(posFrload) @ np.transpose(R_p)*(np.linalg.norm(wi))**2 @ qi
                 term     += skew(posFrload)@ np.transpose(R_p) @  np.array([0,0,-m*self.g])
-            Nq[i:i+3] = m*l*skew(qi) @ R_p @ skew(wl) @skew(wl) @ posFrload  \
-                      - l*skew(qi) @ np.array([0,0,-m*self.g])
+                Nq[i:i+3] = m*l*skew(qi) @ R_p @ skew(wl) @skew(wl) @ posFrload  
             i+=3
-        Nq[0:3] = -Nq[0:3] + self.grav_
+        Nq[0:3] = -Nq[0:3] +  self.grav_
         if not self.pointmass:
             Nq[3:6] = -skew(wl)@self.J_bar@wl - Nq[3:6] + term
         return Nq
 
-    def getuinp(self, uavs_params):
-        
+
+    def getuinp(self, uavs_params):        
         u_inp = np.zeros((self.sys_dim,))
         i, j, k = 0, self.plSysDim, self.plStateSize
         for name, uav in uavs_params.items():
@@ -200,9 +203,10 @@ class SharedPayload:
             wi = self.state[k+3*self.numOfquads:k+3+3*self.numOfquads]
             k+=3
             u_inp[0:3]   += self.ctrlInp[i,:]
+            # print(u_inp[0:3])
             if not self.pointmass:
-                u_inp[3:6]   += skew(posFrload)@np.transpose(R_p) @ self.ctrlInp[i,:]
-            u_inp[j:j+3]  = - l*skew(qi) @ self.ctrlInp[i,:]
+                u_inp[3:6] += skew(posFrload)@np.transpose(R_p) @ self.ctrlInp[i,:]
+            u_inp[j:j+3]    = -l*skew(qi) @ (self.ctrlInp[i,:] + np.array([0,0,-m*self.g]))
             i+=1
             j+=3
         return u_inp
@@ -244,10 +248,9 @@ class SharedPayload:
         for i in range(0, self.numOfquads):
             qi = self.state[k:k+3]
             wi = self.state[k+3*self.numOfquads:k+3+3*self.numOfquads]
-
             currVl[j:j+3] = wi
-            wiNext = accl[j:j+3]*self.dt + wi
-            velNext[j:j+3] = wiNext
+            wdi = accl[j:j+3]
+            velNext[j:j+3] = wdi*self.dt + wi
             
             if not self.pointmass:
                 currPos[j+1:j+4] = qi
@@ -257,7 +260,6 @@ class SharedPayload:
                 posNext[j:j+3] = (np.cross(wi, qi))*self.dt + qi  
             k+=3
             j+=3
-            
         posNext[0:3] = currVl[0:3] * self.dt + currPos[0:3]
         velNext[0:3] = accl[0:3] * self.dt + currVl[0:3]
         if not self.pointmass:
@@ -332,9 +334,12 @@ class UavModel:
         self.state = state
         self.dt    = dt
         self.controller = uav_params['controller']
-        self.fullState = np.empty((1,13))
+        self.fullState = np.empty((1,16))
         self.ctrlInps  = np.empty((1,8))
-        self.refState  = np.empty((1,6))
+        if self.controller['name'] in 'lee':
+            self.refState  = np.empty((1,12))
+        else:
+            self.refState  = np.empty((1,6))
         self.drag  = float((uav_params['drag']))
         if self.drag ==  1:
             self.Kaero = np.diag([-9.1785e-7, -9.1785e-7, -10.311e-7]) 
@@ -387,8 +392,10 @@ class UavModel:
     def stackStandCtrl(self, state, tau_inp, ref_state):
         ## This method stacks the actual and reference states of the UAV 
         ## and the control input vector [fz taux, tauy, tauz, f1, f2, f3, f4]
-        self.state = state
-        self.fullState  = np.vstack((self.fullState, self.state))
+        curr_w = self.state[10::]
+        wd    = self.invI @ (tau_inp[1::] - skew(curr_w) @ self.I @ curr_w)
+        state = np.hstack((state,wd))
+        self.fullState  = np.vstack((self.fullState, state))
         f_motors   = self.invAll @ tau_inp 
         self.ctrlInps   = np.vstack((self.ctrlInps, np.array([tau_inp, f_motors]).reshape(1,8)))
         self.refState   = np.vstack((self.refState, ref_state))
