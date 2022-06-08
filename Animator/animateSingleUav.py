@@ -362,7 +362,7 @@ class PlotandAnimate:
         self.ax  = ax
         self.ax.view_init(25,35)
         self.shared = shared
-    def initializeQuad(self):    
+    def initializeQuad(self, uav):    
         # Create the lines and vectors to draw body and desired frames
         self.line, = self.ax.plot(self.full_state[0,0:1], self.full_state[1,0:1], self.full_state[2,0:1], 'b--', lw=1)
         self.vec1  = self.ax.quiver([],[],[],[],[],[])
@@ -371,11 +371,13 @@ class PlotandAnimate:
         self.vec1d = self.ax.quiver([],[],[],[],[],[])
         self.vec2d = self.ax.quiver([],[],[],[],[],[])
         self.vec3d = self.ax.quiver([],[],[],[],[],[])
+        if uav.controller['name'] in 'lee':
         #Create the arms of the quadrotor in the body frame
-        # self.armb1  = np.array([[self.uavModel.d*10**(1.7)*np.cos(0)], [self.uavModel.d*10**(1.7)*np.sin(0)] ,[0]])
-        # self._armb1 = np.array([[-self.uavModel.d*10**(1.7)*np.cos(0)], [-self.uavModel.d*10**(1.7)*np.sin(0)] ,[0]])
-        self.armb1  = np.array([[self.uavModel.d*np.cos(0)], [self.uavModel.d*np.sin(0)] ,[0]])
-        self._armb1 = np.array([[-self.uavModel.d*np.cos(0)], [-self.uavModel.d*np.sin(0)] ,[0]])
+            self.armb1  = np.array([[self.uavModel.d*np.cos(0)], [self.uavModel.d*np.sin(0)] ,[0]])
+            self._armb1 = np.array([[-self.uavModel.d*np.cos(0)], [-self.uavModel.d*np.sin(0)] ,[0]])
+        else:
+            self.armb1  = np.array([[self.uavModel.d*10**(1.7)*np.cos(0)], [self.uavModel.d*10**(1.7)*np.sin(0)] ,[0]])
+            self._armb1 = np.array([[-self.uavModel.d*10**(1.7)*np.cos(0)], [-self.uavModel.d*10**(1.7)*np.sin(0)] ,[0]])
         
         q90z        = rn.from_euler(0, 0, np.radians(90),convention='xyz')
         rot90z      = rn.to_matrix(q90z)
@@ -390,8 +392,8 @@ class PlotandAnimate:
     def setlimits(self):
         # This method finds the maximum value in the x-y-z actual states for the UAV(s) and sets the limits of the figure accordingly   
         # edge: adds extra space for the figure 
-        edge_ = -2
-        edge  = 2
+        edge_ = -1
+        edge  = 1
         maxs_  = []
         for uav in self.uavModels.values():
             max_x = max(uav.fullState[:,0])
@@ -502,7 +504,7 @@ class PlotandAnimate:
                 else:
                     self.payload     = self.payloads[id]
                 self.plFullstate = self.payload.plFullState[::self.sample, :]            
-            self.initializeQuad()
+            self.initializeQuad(self.uavModel)
             x, y, z, q                   = self.getCurrState(i)
             xref,yref,zref               = self.getRefState(i) 
             armI1, armI2, _armI1, _armI2 = self.getArmpos(x[i],y[i],z[i],q)

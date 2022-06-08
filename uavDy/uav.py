@@ -31,18 +31,17 @@ class Payload:
     def getPL_nextpos(self, fz, curr_posl, curr_vl, curr_p, curr_wl, curr_q):
         R_IB  = to_matrix(curr_q)
         pd    = np.cross(curr_wl, curr_p)
-        al    =   (((np.dot(curr_p, fz*R_IB @ np.array([0,0,1])) - (self.m * self.lc * (np.dot(pd, pd)))) * curr_p)/self.mt) - np.array([0,0,9.81])
+        u     = fz * R_IB * np.array([0,0,1]) 
+        al    =  (1/self.mt) * (self.grav_ + (np.vdot(curr_p, R_IB @ np.array([0,0,fz])) - (self.m * self.lc * (np.vdot(pd, pd)))) * curr_p)
         Vl_   = al * self.dt + curr_vl
         posl_ = curr_vl * self.dt + curr_posl
         return posl_, Vl_
 
-
     def getPLAngularState(self, fz, curr_q, curr_p, curr_wl):
         R_IB = to_matrix(curr_q)
-        u = fz*R_IB @ np.array([0,0,1])
-        wld  = (1/(self.lc*self.m)) * (-np.cross(curr_p, u))
+        wld  = (1/(self.lc*self.m)) * ( skew(-curr_p) @ R_IB @ np.array([0,0,fz]))
         wl_  = wld * self.dt + curr_wl
-        pd    =  np.cross(curr_wl, curr_p)
+        pd    =  skew(curr_wl) @ curr_p
         p_    = pd*self.dt + curr_p
         return p_, wl_
 
@@ -57,9 +56,10 @@ class Payload:
         fz       = tau_inp[0]
         tau_i    = tau_inp[1::]
         
+        poslNext, VlNext  = self.getPL_nextpos(fz, curr_posl, curr_vl, curr_p, curr_wl, curr_q)
         pNext, wlNext     = self.getPLAngularState(fz, curr_q, curr_p, curr_wl)
         qNext, wNext      = uav.getNextAngularState(curr_w, curr_q, tau_i)
-        poslNext, VlNext  = self.getPL_nextpos(fz, curr_posl, curr_vl, curr_p, curr_wl, curr_q)
+        
         
         self.state[0:3]   = poslNext   # position: x,y,z
         self.state[3:6]   = VlNext  # linear velocity: xdot, ydot, zdot
@@ -203,10 +203,10 @@ class SharedPayload:
             wi = self.state[k+3*self.numOfquads:k+3+3*self.numOfquads]
             k+=3
             u_inp[0:3]   += self.ctrlInp[i,:]
-            # print(u_inp[0:3])
             if not self.pointmass:
                 u_inp[3:6] += skew(posFrload)@np.transpose(R_p) @ self.ctrlInp[i,:]
-            u_inp[j:j+3]    = -l*skew(qi) @ (self.ctrlInp[i,:] + np.array([0,0,-m*self.g]))
+                u_inp[j:j+3] += m * l * skew(qi) @ R_p @ skew(wl) @ skew(wl) @ posFrload
+            u_inp[j:j+3]     -= l*skew(qi) @ (self.ctrlInp[i,:] + np.array([0,0,-m*self.g]))
             i+=1
             j+=3
         return u_inp

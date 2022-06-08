@@ -164,7 +164,7 @@ def controllerLee(uavModel, control, setpoint, sensors, state, tick):
 
     FdI = desAcc + gravComp  - kp * ep- kv * ev
     control.thrustSI  = (m * FdI.T @ R @ np.array([[0],[0],[1]]))[0,0]
-   
+    print(ep.T, tick)
     Rd  = computeDesiredRot(FdI,0)
     Rtd = np.transpose(Rd)
     

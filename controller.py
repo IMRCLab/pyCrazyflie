@@ -314,18 +314,24 @@ def main(filename, initUavs, animateOrPlotdict, params):
         timeStamped_traj[id] = np.loadtxt(input, delimiter=',') 
         tf_ms = timeStamped_traj[id][0,-1]*1e3
     # Simulation time
-    tf_sim = tf_ms + 5.1e3
+    tf_sim = tf_ms + 4.1e3
       # final time of traj in ms
     print('\nTotal trajectory time: '+str(tf_sim*1e-3)+ 's')
     print('Simulating...')
-   
-    
+    controls, setpoints, sensors_, states =  {}, {}, {}, {}
+    for id in uavs.keys():
+        control, setpoint, sensors, state = initController(uavs[id].controller)
+        controls[id]  = control
+        setpoints[id] = setpoint
+        sensors_[id]  = sensors
+        states[id]    = state 
     if shared:
+        print('Evolution of Lee\'s Model')
         for tick in range(0, int(tf_sim)+1):
             j = plStSize
             ctrlStack = np.empty((1,4))
             for id in uavs.keys():
-                control, setpoint, sensors, state = initController(uavs[id].controller)
+                control, setpoint, sensors, state = controls[id], setpoints[id], sensors_[id], states[id]
                 #initialize the controller and allocate current state (both sensor and state are the state)
                 # This is kind of odd and should be part of state
                 if tick <= int(tf_ms):    
@@ -341,18 +347,20 @@ def main(filename, initUavs, animateOrPlotdict, params):
                     control, des_w, des_wd  = cffirmware.controllerLee(uavs[id], control, setpoint, sensors, state, tick)
                     ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)               
                 else:    
-                    cffirmware.controllerSJC(control, setpoint, sensors, state, 0)
+                    cffirmware.controllerSJC(control, setpoint, sensors, state, tick)
                
                 control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
                 ctrlStack   = np.vstack((ctrlStack, control_inp.reshape(1,4)))
                 ctrlInp     = control_inp[0]*rn.to_matrix(uavs[id].state[6:10]) @ np.array([0,0,1])
-            
+                
+                payload.stackCtrl(ctrlInp.reshape(1,3))
                 uavs[id].state = StatefromSharedPayload(payload, uavs[id].state[6::], uavs[id].lc, j)
                 uavs[id].stackStandCtrl(uavs[id].state, control_inp, ref_state)
-                j +=3
-            
-                payload.stackCtrl(ctrlInp.reshape(1,3))
-            
+                j +=3      
+                controls[id]  = control
+                setpoints[id] = setpoint
+                sensors_[id]  = sensors
+                states[id]    = state   
             payload.cursorUp() 
             uavs, loadState =  payload.stateEvolution(ctrlStack, uavs, uavs_params)
             payload.stackState()
@@ -362,6 +370,7 @@ def main(filename, initUavs, animateOrPlotdict, params):
         animateOrPlot(uavs, payload, animateOrPlotdict, filename, tf_sim, shared)
 
     else:
+        print('Evolution of Kumar\'s Model')
         for id in uavs.keys():
             #initialize the controller and allocate current state (both sensor and state are the state)
             # This is kind of odd and should be part of state
