@@ -104,6 +104,7 @@ class SharedPayload:
         self.plFullState = np.empty((1,16+3*self.numOfquads))
         self.ctrlInp = np.empty((1,3))
         self.state = self.getInitState(uavs_params, payload_params)
+        self.accl   = np.zeros(self.sys_dim,)
         
        
     
@@ -126,33 +127,35 @@ class SharedPayload:
 
     def getBq(self, uavs_params):
         Bq = np.zeros((self.sys_dim, self.sys_dim))
+      
         Bq[0:3,0:3] = self.mt*np.identity(3)
-        ones = np.ones((3,3))
-
+      
         if not self.pointmass:
             Bq[3:6,3:6] = self.J_bar
+
         i = self.plSysDim
         k = self.plStateSize
+      
         for name, uav in uavs_params.items():
             m = float(uav['m'])
             l = float(uav['l_c'])
-            posFrload = uav['pos_fr_payload']
+            
             qi = self.state[k:k+3]
             k+=3
+
             if not self.pointmass:
                 R_p = to_matrix(self.state[6:10])
-            else: 
-                R_p = np.identity(3)
-            Bq[0:3, i:i+3] = m*l*skew(qi)
-            Bq[i:i+3,0:3]  = -m*l*skew(qi)
-            Bq[i:i+3, i:i+3] = m*(l**2)*np.identity(3)
+                posFrload = uav['pos_fr_payload']
+            
+            Bq[i:i+3,0:3]    = -m*skew(qi) # Lee 2018
+            Bq[i:i+3, i:i+3] = m*(l)*np.identity(3) # Lee 2018
             if not self.pointmass:
                 Bq[0:3, 3:6]  += -m * R_p @ skew(np.array(posFrload))
                 Bq[3:6,0:3]   +=  m * skew(np.array(posFrload)) @ np.transpose(R_p) 
                 Bq[i:i+3, 3:6] = m*l*skew(qi) @ R_p @ skew(np.array(posFrload))
                 Bq[3:6, i:i+3] = m*l*skew(np.array(posFrload)) @ np.transpose(R_p) @ skew(qi)
+            
             i+=3
-
         return Bq
 
     def getNq(self, uavs_params):
@@ -160,70 +163,65 @@ class SharedPayload:
         i = self.plSysDim
         k = self.plStateSize
         term = np.zeros((3,))
+        Mq   = self.mt*np.identity(3)
+
+        
+       
         for name, uav in uavs_params.items():
             m = float(uav['m'])
             l = float(uav['l_c'])
-            posFrload = np.array(uav['pos_fr_payload'])
+           
             if not self.pointmass:
+                posFrload = np.array(uav['pos_fr_payload'])
                 R_p = to_matrix(self.state[6:10])
                 wl = self.state[10:13]
-            else: 
-                R_p = np.identity(3)
-                wl = np.zeros(3,)
+
             qi = self.state[k:k+3]
             wi = self.state[k+3*self.numOfquads:k+3+3*self.numOfquads]
             k+=3
-            Nq[0:3]  +=  m*l*(np.linalg.norm(wi))**2*qi
+            Nq[0:3]  -=  m*l*np.dot(wi,wi)*qi # Lee 2018
+            Nq[i:i+3] = -m*skew(qi) @ np.array([0,0,-self.g]) # Lee 2018
             if not self.pointmass:
                 Nq[0:3]  += m*R_p @ skew(wl) @skew(wl) @ posFrload
                 Nq[3:6]  += m*l*skew(posFrload) @ np.transpose(R_p)*(np.linalg.norm(wi))**2 @ qi
                 term     += skew(posFrload)@ np.transpose(R_p) @  np.array([0,0,-m*self.g])
                 Nq[i:i+3] = m*l*skew(qi) @ R_p @ skew(wl) @skew(wl) @ posFrload  
+
             i+=3
-        Nq[0:3] = -Nq[0:3] +  self.grav_
+        Nq[0:3] += Mq @ np.array([0,0,-self.g])
         if not self.pointmass:
             Nq[3:6] = -skew(wl)@self.J_bar@wl - Nq[3:6] + term
+        
         return Nq
 
 
     def getuinp(self, uavs_params):        
         u_inp = np.zeros((self.sys_dim,))
         i, j, k = 0, self.plSysDim, self.plStateSize
+
         for name, uav in uavs_params.items():
             m = float(uav['m'])
             l = float(uav['l_c'])
-            posFrload = np.array(uav['pos_fr_payload'])
+
             if not self.pointmass:
                 R_p = to_matrix(self.state[6:10])
                 wl = self.state[10:13]
-            else: 
-                R_p = np.identity(3)
-                wl = np.zeros(3,)
+                posFrload = np.array(uav['pos_fr_payload'])
+          
             qi = self.state[k:k+3]
             wi = self.state[k+3*self.numOfquads:k+3+3*self.numOfquads]
             k+=3
-            u_inp[0:3]   += self.ctrlInp[i,:]
+            qiqiT = qi.reshape((3,1))@(qi.T).reshape((1,3))
+            u_inp[0:3] += qiqiT @ self.ctrlInp[i,:]
+            u_inp[j:j+3] = - skew(qi) @ (np.eye(3) - qiqiT) @  self.ctrlInp[i,:]
+
             if not self.pointmass:
                 u_inp[3:6] += skew(posFrload)@np.transpose(R_p) @ self.ctrlInp[i,:]
                 u_inp[j:j+3] += m * l * skew(qi) @ R_p @ skew(wl) @ skew(wl) @ posFrload
-            u_inp[j:j+3]     -= l*skew(qi) @ (self.ctrlInp[i,:] + np.array([0,0,-m*self.g]))
+           
             i+=1
             j+=3
         return u_inp
-
-
-    def stackCtrl(self, ctrlInp):  
-       self.ctrlInp = np.vstack((self.ctrlInp,ctrlInp))
-      
-    def stackState(self):
-        self.plFullState  = np.vstack((self.plFullState, self.plstate)) 
-   
-    def cursorPlUp(self):
-        self.plFullState = np.delete(self.plFullState, 0, 0)
-
-    def cursorUp(self):
-        self.ctrlInp = np.delete(self.ctrlInp, 0, 0)
-       
 
     def getNextState(self, accl):
         # if not pointmass:
@@ -242,39 +240,42 @@ class SharedPayload:
        
         posNext = np.zeros_like(currPos)
         velNext = np.zeros_like(currVl)  
-        k = self.plStateSize
+        velNext[0:3] = accl[0:3] * self.dt + currVl[0:3]
+        posNext[0:3] = currVl[0:3] * self.dt + currPos[0:3]
+        
+        
+        k = self.plStateSize        
         j = self.plSysDim
-
         for i in range(0, self.numOfquads):
             qi = self.state[k:k+3]
             wi = self.state[k+3*self.numOfquads:k+3+3*self.numOfquads]
             currVl[j:j+3] = wi
             wdi = accl[j:j+3]
             velNext[j:j+3] = wdi*self.dt + wi
-            
+
             if not self.pointmass:
                 currPos[j+1:j+4] = qi
-                posNext[j+1:j+4] = (np.cross(wi, qi))*self.dt + qi  
+                qd = np.cross(wi, qi)
+                posNext[j+1:j+4] = qd*self.dt + qi  
             else:
                 currPos[j:j+3] = qi
-                posNext[j:j+3] = (np.cross(wi, qi))*self.dt + qi  
+                qd = np.cross(wi, qi)
+                posNext[j:j+3] = qd*self.dt + qi  
+                qi = posNext[j:j+3]
             k+=3
             j+=3
-        posNext[0:3] = currVl[0:3] * self.dt + currPos[0:3]
-        velNext[0:3] = accl[0:3] * self.dt + currVl[0:3]
         if not self.pointmass:
             posNext[3:7] = quat_integrate(currPos[3:7], currVl[3:6], self.dt)        
         return velNext, posNext
 
-    def stateEvolution(self,control_inps, uavs, uavs_params):
-        control_inps = np.delete(control_inps, 0,0)
-        
+    def stateEvolution(self,torques, uavs, uavs_params):
+        torques = np.delete(torques, 0,0)
+    
         Bq    = self.getBq(uavs_params)
         Nq    = self.getNq(uavs_params)
         u_inp = self.getuinp(uavs_params)
-        accl = np.linalg.inv(Bq)@(Nq + u_inp)
-        velNext, posNext = self.getNextState(accl)
-        
+        velNext, posNext = self.getNextState(self.accl)
+        self.accl = np.linalg.inv(Bq)@(Nq + u_inp)
         self.state[0:3]   = posNext[0:3]
         self.state[3:6]   = velNext[0:3]
         if not self.pointmass:
@@ -302,7 +303,7 @@ class SharedPayload:
             j+=3
         m = 0
         for id in uavs.keys():
-            tau    = control_inps[m,1::].reshape(3,)
+            tau    = torques[m,:].reshape(3,)
             curr_q = uavs[id].state[6:10]
             curr_w = uavs[id].state[10::]
             qNext, wNext = uavs[id].getNextAngularState(curr_w, curr_q, tau)
@@ -310,6 +311,20 @@ class SharedPayload:
             uavs[id].state[10::] = wNext  
             m+=1
         return uavs, self.state 
+    
+    
+    def stackCtrl(self, ctrlInp):  
+       self.ctrlInp = np.vstack((self.ctrlInp,ctrlInp))
+
+    def stackState(self):
+        self.plFullState  = np.vstack((self.plFullState, self.plstate)) 
+   
+    def cursorPlUp(self):
+        self.plFullState = np.delete(self.plFullState, 0, 0)
+
+    def cursorUp(self):
+        self.ctrlInp = np.delete(self.ctrlInp, 0, 0)
+       
 
 class UavModel:
     """initialize an instance of UAV object with the following physical parameters:

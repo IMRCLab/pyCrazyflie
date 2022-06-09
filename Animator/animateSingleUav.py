@@ -139,7 +139,7 @@ def plotPayloadStates(payload, posq, tf_sim, shared):
 
 
 ###############################################################################################
-def outputPlots(uavs, payloads, savePlot, tf_sim, pdfName, shared):
+def outputPlots(uavs, payloads, tf_sim, pdfName, shared):
     print('Plotting...')
     f = PdfPages(pdfName)
         # perform file operations
@@ -274,6 +274,7 @@ def outputPlots(uavs, payloads, savePlot, tf_sim, pdfName, shared):
         
         ax6.plot(time, cont_stack[:,1], lw=0.8, c='darkblue'), ax7.plot(time, cont_stack[:,2], lw=0.8, c='darkblue'), ax8.plot(time, cont_stack[:,3],lw=0.8, c='darkblue')
         ax6.set_ylabel('taux [N.m]',fontsize='small'), ax7.set_ylabel('tauy [N.m]',fontsize='small'), ax8.set_ylabel('tauz [N.m]',fontsize='small')
+        ax7.set_ylim([-0.1, 0.1])
         fig5.supxlabel(ts,fontsize='small')
 
         create_subtitle(fig5, gs[::, 0], 'Force Control Input')
@@ -300,26 +301,23 @@ def outputPlots(uavs, payloads, savePlot, tf_sim, pdfName, shared):
 
         if uav_.pload:
             fig8, fig9, fig10, fig11, fig12 = plotPayloadStates(payload, pos, tf_sim, shared)
-        if savePlot:
-            textfig.savefig(f, format='pdf', bbox_inches='tight')
-            fig1.savefig(f, format='pdf', bbox_inches='tight')
-            fig2.savefig(f, format='pdf', bbox_inches='tight')
-            fig3.savefig(f, format='pdf', bbox_inches='tight')
-            if uav_.controller['name'] in 'lee':
-                fig13.savefig(f, format='pdf', bbox_inches='tight')
-            fig4.savefig(f, format='pdf', bbox_inches='tight')  
-            fig5.savefig(f, format='pdf', bbox_inches='tight')  
-            fig6.savefig(f, format='pdf', bbox_inches='tight')
-            fig7.savefig(f, format='pdf', bbox_inches='tight')
-            if uav_.pload:
-                fig8.savefig(f, format='pdf', bbox_inches='tight')
-                fig9.savefig(f, format='pdf', bbox_inches='tight')
-                fig10.savefig(f, format='pdf', bbox_inches='tight')
-                fig11.savefig(f, format='pdf', bbox_inches='tight')
-                fig12.savefig(f, format='pdf', bbox_inches='tight')
-            
-                
-
+    
+        textfig.savefig(f, format='pdf', bbox_inches='tight')
+        fig1.savefig(f, format='pdf', bbox_inches='tight')
+        fig2.savefig(f, format='pdf', bbox_inches='tight')
+        fig3.savefig(f, format='pdf', bbox_inches='tight')
+        if uav_.controller['name'] in 'lee':
+            fig13.savefig(f, format='pdf', bbox_inches='tight')
+        fig4.savefig(f, format='pdf', bbox_inches='tight')  
+        fig5.savefig(f, format='pdf', bbox_inches='tight')  
+        fig6.savefig(f, format='pdf', bbox_inches='tight')
+        fig7.savefig(f, format='pdf', bbox_inches='tight')
+        if uav_.pload:
+            fig8.savefig(f, format='pdf', bbox_inches='tight')
+            fig9.savefig(f, format='pdf', bbox_inches='tight')
+            fig10.savefig(f, format='pdf', bbox_inches='tight')
+            fig11.savefig(f, format='pdf', bbox_inches='tight')
+            fig12.savefig(f, format='pdf', bbox_inches='tight')
     f.close()
 
 

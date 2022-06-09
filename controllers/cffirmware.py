@@ -162,9 +162,9 @@ def controllerLee(uavModel, control, setpoint, sensors, state, tick):
     R = rn.to_matrix(uavModel.state[6:10])
     Rt = np.transpose(R)
 
-    FdI = desAcc + gravComp  - kp * ep- kv * ev
+    FdI = desAcc + gravComp  - kp * ep - kv * ev
     control.thrustSI  = (m * FdI.T @ R @ np.array([[0],[0],[1]]))[0,0]
-    print(ep.T, tick)
+    # print(ep.T, tick)
     Rd  = computeDesiredRot(FdI,0)
     Rtd = np.transpose(Rd)
     
@@ -172,13 +172,13 @@ def controllerLee(uavModel, control, setpoint, sensors, state, tick):
     curr_w   = uavModel.state[10::].reshape((3,1))
     curr_w_  = curr_w.reshape(3,) # reshape of omega for cross products
 
-    zb      = R[:,2]
-    T       = m * np.dot(FdI.reshape(3,), zb)
+    zb      = Rd[:,2]
+    T       = control.thrustSI#m * np.dot(FdI.reshape(3,), zb)
     Td      = m * np.dot(desjerk, zb)
-    des_w  = (computeWd(m, R, T, desjerk)).reshape((3,1))
+    des_w  = (computeWd(m, Rd, T, desjerk)).reshape((3,1))
     des_w_ = des_w.reshape(3,)
-    Td_dot  = np.dot(zb, m * dessnap) - np.dot(zb, np.cross(np.cross(curr_w_, curr_w_), np.dot(T, zb)))
-    des_wd  = (computeWddot(m, R, curr_w, T, Td, Td_dot, dessnap)).reshape(3,1)
+    Td_dot  = np.dot(zb, m * dessnap) - np.dot(zb, np.cross(np.cross(des_w_, des_w_), np.dot(T, zb)))
+    des_wd  = (computeWddot(m, R, des_w, T, Td, Td_dot, dessnap)).reshape(3,1)
     ew  = (curr_w - Rt @ Rd @ des_w).reshape((3,1))
 
     control.torque = ( -kr * er  - kw * ew + (np.cross(curr_w_, (I @ curr_w_))).reshape(3,1) \
