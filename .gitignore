@@ -9,3 +9,5 @@ __pycache__
 !/trajectoriescsv/infinity8.csv
 !/trajectoriescsv/robot11.csv
 !/trajectoriescsv/robot21.csv
+!/trajectoriescsv/circleTraj1.csv
+!/trajectoriescsv/circleTraj2.csv
