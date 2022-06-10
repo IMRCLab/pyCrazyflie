@@ -38,7 +38,7 @@ def setTrajmode(setpoint):
     setpoint.mode.yaw = cffirmware.modeDisable
     return setpoint
 
-def updateDesState(setpoint,controller, fulltraj):
+def updateDesState(setpoint, controller, fulltraj):
     """This function updates the desired states"""
     setpoint.position.x = fulltraj[0]  # m
     setpoint.position.y = fulltraj[1]  # m
@@ -49,14 +49,21 @@ def updateDesState(setpoint,controller, fulltraj):
     setpoint.acceleration.x = fulltraj[6]  # m/s^2
     setpoint.acceleration.y = fulltraj[7]  # m/s^2
     setpoint.acceleration.z = fulltraj[8]  # m/s^2
-    if controller['name'] in 'lee':
+    setpoint.attitude.yaw = 0  # deg
+    if controller['name'] in 'lee' and len(fulltraj) == 15:
         setpoint.jerk.x = fulltraj[9]
         setpoint.jerk.y = fulltraj[10]
         setpoint.jerk.z = fulltraj[11]
         setpoint.snap.x = fulltraj[12]
         setpoint.snap.y = fulltraj[13]
         setpoint.snap.z = fulltraj[14]
-    setpoint.attitude.yaw = 0  # deg
+    elif controller['name'] in 'lee' and len(fulltraj) == 9:
+        setpoint.jerk.x = 0 
+        setpoint.jerk.y = 0 
+        setpoint.jerk.z = 0 
+        setpoint.snap.x = 0 
+        setpoint.snap.y = 0 
+        setpoint.snap.z = 0 
     return setpoint
     
 def updateSensor(sensors, uav):
@@ -184,15 +191,16 @@ def animateTrajectory(uavs, payloads, videoname, shared):
     print("Run time:  {:.3f}s".format((end - now)))
 
 def animateOrPlot(uavs, payloads, animateOrPlotdict, filename, tf_sim, shared): 
-    if animateOrPlotdict['animate']:
-        videoname = filename + '.gif'
-        animateTrajectory(uavs, payloads, videoname, shared)     
     # The plot will be shown eitherways
     # savePlot: saves plot in pdf format
-    if animateOrPlotdict['savePlot']:
+    if animateOrPlotdict['plot']:
         pdfName = filename + '.pdf'
         animateSingleUav.outputPlots(uavs, payloads, tf_sim, pdfName, shared)
 
+    if animateOrPlotdict['animate']:
+        videoname = filename + '.gif'
+        animateTrajectory(uavs, payloads, videoname, shared)     
+  
 def setParams(params):
     dt           = float(params['dt'])
     uavs, payloads, trajectories  = {}, {}, {}
@@ -220,10 +228,8 @@ def StatefromSharedPayload(payload, angState, lc, j):
     wi = payload.state[j+3*payload.numOfquads:j+3+3*payload.numOfquads]
     uavState =  np.zeros((13,))
     posq =  payload.state[0:3] - lc * qi
-    # print(payload.state[0:3], posq, qi)
     pdot = np.cross(wi, qi)
     velq = payload.state[3:6] - lc * pdot
-    # print(velq,payload.state[3:6])
     uavState[0:3]  = posq
     uavState[3:6]  = velq
     uavState[6:10] = angState[0:4]
@@ -327,7 +333,6 @@ def main(filename, initUavs, animateOrPlotdict, params):
         sensors_[id]  = sensors
         states[id]    = state 
     if shared:
-        print('Evolution of Lee\'s Model')
         for tick in range(0, int(tf_sim)+1):
             j = plStSize
             torques = np.zeros((1,3))
@@ -345,7 +350,6 @@ def main(filename, initUavs, animateOrPlotdict, params):
                 state, fullState = updateState(state, uavs[id])
                 sensors          = updateSensor(sensors, uavs[id])
                 if uavs[id].controller['name'] in 'lee':
-                    #print(uavs[id].m*9.81) 42.5754
                     control, des_w, des_wd  = cffirmware.controllerLee(uavs[id], control, setpoint, sensors, state, tick)
                     ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)               
                 else:    
@@ -362,9 +366,7 @@ def main(filename, initUavs, animateOrPlotdict, params):
                 sensors_[id]  = sensors
                 states[id]    = state
             payload.cursorUp() 
-            # print('before evolution payload state: ',payload.state)
             uavs, loadState =  payload.stateEvolution(torques, uavs, uavs_params)
-            # print('after evolution payload state: ',payload.state)
             payload.stackState()
             for id in uavs.keys():
                 uavs[id].state = StatefromSharedPayload(payload, uavs[id].state[6::], uavs[id].lc, j)
@@ -376,7 +378,6 @@ def main(filename, initUavs, animateOrPlotdict, params):
         animateOrPlot(uavs, payload, animateOrPlotdict, filename, tf_sim, shared)
 
     else:
-        print('Evolution of Kumar\'s Model')
         for id in uavs.keys():
             #initialize the controller and allocate current state (both sensor and state are the state)
             # This is kind of odd and should be part of state
@@ -405,13 +406,13 @@ def main(filename, initUavs, animateOrPlotdict, params):
                     control, des_w, des_wd  = cffirmware.controllerLee(uavs[id], control, setpoint, sensors, state, tick)     
                     ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)     
                 else:    
-                    cffirmware.controllerSJC(control, setpoint, sensors, state, tick)                # states evolution
+                    cffirmware.controllerSJC(control, setpoint, sensors, state, tick)               
                 control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
                 if uavs[id].pload:
                     payloads[id].PL_nextState(control_inp, uavs[id])
                     uavs[id].state = StQuadfromPL(payloads[id])
                 else:
-                    uavs[id].states_evolution(control_inp)
+                    uavs[id].states_evolution(control_inp)  # states evolution
                 uavs[id].stackStandCtrl(uavs[id].state, control_inp, ref_state)    
             uavs[id].cursorUp()
             if uavs[id].pload:
@@ -427,10 +428,10 @@ if __name__ == '__main__':
         parser = argparse.ArgumentParser()
         parser.add_argument('filename', type=str, help="Name of the CSV file in trajectoriescsv directory")
         parser.add_argument('--animate', default=False, action='store_true', help='Set true to save a gif in Videos directory')
-        parser.add_argument('--savePlot', default=False, action='store_true', help='Set true to save plots in a pdf  format')
+        parser.add_argument('--plot', default=False, action='store_true', help='Set true to save plots in a pdf  format')
         parser.add_argument('--initUavs', default=False, action='store_true', help='Set true to initialize the conditions of the UAVs and then compute the payload initial condition')
         args   = parser.parse_args()   
-        animateOrPlotdict = {'animate':args.animate, 'savePlot':args.savePlot}
+        animateOrPlotdict = {'animate':args.animate, 'plot':args.plot}
     
         import yaml
         with open('config/initialize.yaml') as f:

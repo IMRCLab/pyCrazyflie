@@ -7,5 +7,4 @@ __pycache__
 
 !/Videos/infinity8.gif
 !/trajectoriescsv/infinity8.csv
-!/trajectoriescsv/robot11.csv
-!/trajectoriescsv/robot21.csv
+!/trajectoriescsv/helix_011.csv

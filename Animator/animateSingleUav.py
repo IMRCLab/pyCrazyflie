@@ -369,14 +369,8 @@ class PlotandAnimate:
         self.vec1d = self.ax.quiver([],[],[],[],[],[])
         self.vec2d = self.ax.quiver([],[],[],[],[],[])
         self.vec3d = self.ax.quiver([],[],[],[],[],[])
-        if uav.controller['name'] in 'lee':
-        #Create the arms of the quadrotor in the body frame
-            self.armb1  = np.array([[self.uavModel.d*np.cos(0)], [self.uavModel.d*np.sin(0)] ,[0]])
-            self._armb1 = np.array([[-self.uavModel.d*np.cos(0)], [-self.uavModel.d*np.sin(0)] ,[0]])
-        else:
-            self.armb1  = np.array([[self.uavModel.d*10**(1.7)*np.cos(0)], [self.uavModel.d*10**(1.7)*np.sin(0)] ,[0]])
-            self._armb1 = np.array([[-self.uavModel.d*10**(1.7)*np.cos(0)], [-self.uavModel.d*10**(1.7)*np.sin(0)] ,[0]])
-        
+        self.armb1  = np.array([[self.uavModel.d*10**(1.7)*np.cos(0)], [self.uavModel.d*10**(1.7)*np.sin(0)] ,[0]])
+        self._armb1 = np.array([[-self.uavModel.d*10**(1.7)*np.cos(0)], [-self.uavModel.d*10**(1.7)*np.sin(0)] ,[0]])
         q90z        = rn.from_euler(0, 0, np.radians(90),convention='xyz')
         rot90z      = rn.to_matrix(q90z)
         self.armb2  = rot90z @ (self.armb1.reshape(3,))
@@ -390,8 +384,8 @@ class PlotandAnimate:
     def setlimits(self):
         # This method finds the maximum value in the x-y-z actual states for the UAV(s) and sets the limits of the figure accordingly   
         # edge: adds extra space for the figure 
-        edge_ = -1
-        edge  = 1
+        edge_ = -0.5
+        edge  = 0.5
         maxs_  = []
         for uav in self.uavModels.values():
             max_x = max(uav.fullState[:,0])
@@ -406,11 +400,7 @@ class PlotandAnimate:
             maxs_.append(max_)
 
         max_ = max(maxs_)
-    
-        self.ax.set_xlim3d([-max_+edge_, max_+edge])
-        self.ax.set_ylim3d([-max_+edge_, max_+edge])
-        self.ax.set_zlim3d([-max_+edge_, max_+edge])
-        self.ax.set_xlim3d([-max_+edge_, max_+edge])
+        self.ax.set_xlim3d([-max_+edge_, max_+edge+1])
         self.ax.set_ylim3d([-max_+edge_, max_+edge])
         self.ax.set_zlim3d([-max_+edge_, max_+edge])
         self.ax.set_xlabel('X')
