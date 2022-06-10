@@ -405,6 +405,8 @@ def main(filename, initUavs, animateOrPlotdict, params):
                 if uavs[id].controller['name'] in 'lee':
                     control, des_w, des_wd  = cffirmware.controllerLee(uavs[id], control, setpoint, sensors, state, tick)     
                     ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)     
+                elif uavs[id].controller['name'] in 'lee_firmware':
+                    cffirmware.controllerLee(control, setpoint, sensors, state, tick)                           
                 else:    
                     cffirmware.controllerSJC(control, setpoint, sensors, state, tick)               
                 control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
