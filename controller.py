@@ -14,7 +14,7 @@ np.set_printoptions(suppress=True)
 
 def initController(controller):
     """This function initializes the controller"""
-    if controller['name'] in 'lee':
+    if controller['name'] in 'lee_firmware' and controller['name'] in 'lee':
         cffirmware.controllerLeeInit()
     else:
         cffirmware.controllerSJCInit()
@@ -325,14 +325,16 @@ def main(filename, initUavs, animateOrPlotdict, params):
       # final time of traj in ms
     print('\nTotal trajectory time: '+str(tf_sim*1e-3)+ 's')
     print('Simulating...')
-    controls, setpoints, sensors_, states =  {}, {}, {}, {}
-    for id in uavs.keys():
-        control, setpoint, sensors, state = initController(uavs[id].controller)
-        controls[id]  = control
-        setpoints[id] = setpoint
-        sensors_[id]  = sensors
-        states[id]    = state 
+   
+    
     if shared:
+        controls, setpoints, sensors_, states =  {}, {}, {}, {}
+        for id in uavs.keys():
+            control, setpoint, sensors, state = initController(uavs[id].controller)
+            controls[id]  = control
+            setpoints[id] = setpoint
+            sensors_[id]  = sensors
+            states[id]    = state 
         for tick in range(0, int(tf_sim)+1):
             j = plStSize
             torques = np.zeros((1,3))

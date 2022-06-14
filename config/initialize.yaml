@@ -2,7 +2,7 @@ Robots:
   cf4:
       type : "cf21"
       size : "small"
-      m    : 0.028
+      m    : 0.031
       I    : [16.571710e-6, 16.655602e-6, 29.261652e-6]
       d    : 4e-3
       cft  : 0.005964552 
@@ -10,10 +10,10 @@ Robots:
       refTrajPath    : "trajectoriescsv/figure8.csv" # Path of the reference trajectory
       controller  : 
         name: 'lee_firmware' # lee, sjc
-        kp: 10  
-        kd: 5
-        kr: 0.05 #8.81
-        kw: 0.004 #2.54
+        kp: 5.5 #10  
+        kd: 3
+        kr: 0.005 #8.81
+        kw: 0.0009 #2.54
       initConditions : 
         init_pos_Q      : [0, 0, 0] # circleTraj1: [0.91321, 0.240792, 0.699988] # [0, 0, 0.7] #0.216917, 0.417135, 0.700008] #[0.090768, 0.234859, 0.397903] #[0.207449, 0.228759, -0.142567]
         init_attitude_Q : [0,  0,  0] 
