@@ -4,7 +4,10 @@ __pycache__
 *.pdf
 *.gif
 *.csv
-
+/logScripts/logs
+/logScripts/data
+/logScripts/examples
+/logScripts/pdfs
 !/Videos/infinity8.gif
 !/trajectoriescsv/infinity8.csv
 !/trajectoriescsv/helix_011.csv
