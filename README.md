@@ -27,9 +27,15 @@ Add _cffirmware-firmware/_ to your `PYTHONPATH`. Open a terminal in the `pyCrazy
     
 * [ ] In order to animate the simulation in a *.gif* format or save the generated plots in a pdf type this command
     ```bash
-    python3 controller.py name_of_the_file --animate --plotSave
+    python3 controller.py name_of_the_file --animate --plot
     ``` 
-* [ ] `--animate` and `--savePlot` are flags. Their defaults are both False. 
+* [ ] `--animate` and `--plot` are flags. Their defaults are both False. 
 * [ ] The animation will be saved in the `Videos` Directory, while the pdf will be saved in the main `pyCrazyflie` directory.
 ## Expected Output in Vidoes Directory
 ![Markdown Logo](Videos/infinity8.gif)
+## TODOS:
+* [ ] Add tests (with pytest) for different configuration of the config.yaml and examples folders.
+* [ ] Use vispy.
+* [ ] Add clipping for the rotors (to match the actual firmware).
+* [ ] Add lee controller for multi UAVs case in python.
+
