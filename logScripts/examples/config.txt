@@ -1,0 +1,47 @@
+100   # frequency
+50    # buffer size
+log   # file name
+0     # enable on startup (0/1)
+1     # mode (0: disabled, 1: synchronous stabilizer, 2: asynchronous)
+stateEstimateZ.x
+stateEstimateZ.y
+stateEstimateZ.z
+stateEstimateZ.vx
+stateEstimateZ.vy
+stateEstimateZ.vz
+ctrltargetZ.x
+ctrltargetZ.y
+ctrltargetZ.z
+ctrltargetZ.vx
+ctrltargetZ.vy
+ctrltargetZ.vz
+ctrlLee.rpyx
+ctrlLee.rpyy
+ctrlLee.rpyz
+ctrlLee.rpydx
+ctrlLee.rpydy
+ctrlLee.rpydz
+ctrlLee.omegax
+ctrlLee.omegay
+ctrlLee.omegaz
+ctrlLee.omegarx
+ctrlLee.omegary
+ctrlLee.omegarz
+ctrlLee.i_error_attx
+ctrlLee.i_error_atty
+ctrlLee.i_error_attz
+ctrlLee.i_error_posx
+ctrlLee.i_error_posy
+ctrlLee.i_error_posz
+ctrlLee.torquex
+ctrlLee.torquey
+ctrlLee.torquez
+motor.thrust
+motor.roll
+motor.pitch
+motor.yaw
+motor.f1
+motor.f2
+motor.f3
+motor.f4
+pwm.maxThrust
