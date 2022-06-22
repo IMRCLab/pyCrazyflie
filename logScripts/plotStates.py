@@ -44,16 +44,16 @@ def setlimits(ax, full_state):
     return ax
 
 def preparefigs():
-    fig1, ax1 = plt.subplots(3, 1, sharex=True ,sharey=True)
+    fig1, ax1 = plt.subplots(3, 1)#, sharex=True ,sharey=True)
     fig1.tight_layout()
     
-    fig2, ax2 = plt.subplots(3, 1, sharex=True, sharey=True)
+    fig2, ax2 = plt.subplots(3, 1)#, sharex=True, sharey=True)
     fig2.tight_layout()
 
-    fig3, ax3 = plt.subplots(3, 1, sharex=True ,sharey=True)
+    fig3, ax3 = plt.subplots(3, 1)#, sharex=True ,sharey=True)
     fig3.tight_layout()
 
-    fig4, ax4 = plt.subplots(3, 1, sharex=True ,sharey=True)
+    fig4, ax4 = plt.subplots(3, 1)#, sharex=True ,sharey=True)
     fig4.tight_layout()
 
     fig5, ax5 = plt.subplots(2, 3, sharex=True ,sharey=True)
@@ -71,12 +71,35 @@ def preparefigs():
 
     return fig1, ax1, fig2, ax2, fig3, ax3, fig4, ax4, fig5, ax5, fig6, gs, ax6, ax7, ax8, ax9, fig7, ax10
 
+def find_nearest(a, a0):
+    "Element in nd array `a` closest to the scalar value `a0`"
+    idx = np.abs(a - a0).argmin()
+    return idx, a.flat[idx]
+
 def main(args):
     # decode binary log data
+    maxtime = args.maxtime
     logData = cfusdlog.decode(args.file_usd)['fixedFrequency']
- 
+    
+    time = np.column_stack(logData['timestamp']/1000).flatten()
+    time = time - time[0]
+    
+    if maxtime > time[-1]:
+        maxtime = time[-1]
+        time = time[0::]
+    else:
+        idx, value = find_nearest(time, maxtime)
+        time = time[0:idx+1]
+        for id in logData.keys():
+            logData[id] = logData[id][0:idx+1]
+
     logDataKeys = list(logData.keys())
     controller = args.controller
+
+
+   
+        
+
 
     if controller in 'sjc':
         ctrl = 'ctrlSJC.'
@@ -165,18 +188,17 @@ def main(args):
 
 
     ts = 'time [s]'
-    time = np.column_stack(logData['timestamp']/1000).reshape(len(pos),)
-    time = time - time[0]
     fig1, ax1, fig2, ax2, fig3, ax3, fig4, ax4, fig5, ax5, \
     fig6, gs, ax6, ax7, ax8, ax9, fig7 , ax10\
      = preparefigs()
     
-
     ax1[0].plot(time, pos[:,0], c='k', lw=0.75,label='Actual'), ax1[1].plot(time, pos[:,1], lw=0.75, c='k'), ax1[2].plot(time, pos[:,2], lw=0.75, c='k')
     ax1[0].plot(time, posdes[:,0], lw=0.75, c='darkgreen',label='Reference'), ax1[1].plot(time, posdes[:,1], lw=0.75, c='darkgreen'), ax1[2].plot(time, posdes[:,2], lw=0.75, c='darkgreen')
     ax1[0].set_ylabel('x [m]',), ax1[1].set_ylabel('y [m]'), ax1[2].set_ylabel('z [m]')
     ax1[0].legend()
     fig1.supxlabel(ts,fontsize='small')
+
+    ax1[0].set_ylim(-0.1, 0.1), ax1[1].set_ylim(-0.1, 0.1), ax1[2].set_ylim(0.4, 0.58)
 
     grid = plt.GridSpec(3,1)
     create_subtitle(fig1, grid[0, ::], 'Actual vs Reference Positions')
@@ -199,6 +221,8 @@ def main(args):
     ax3[0].plot(time, np.degrees(rpydes[:,0]) ,lw=0.75, c='darkgreen',label='Reference')
     ax3[1].plot(time, np.degrees(rpydes[:,1]) ,lw=0.75, c='darkgreen',label='Reference')
     ax3[2].plot(time, np.degrees(rpydes[:,2]) ,lw=0.75, c='darkgreen',label='Reference')
+ 
+    ax3[0].set_ylim(-5, 5), ax3[1].set_ylim(-8, 8), ax3[2].set_ylim(-200, 200)
 
     ax3[0].set_ylabel('r [deg]',labelpad=-2), ax3[1].set_ylabel('p [deg]',labelpad=-2), ax3[2].set_ylabel('y [deg]',labelpad=-2)
     fig3.supxlabel(ts,fontsize='small')
@@ -216,7 +240,9 @@ def main(args):
 
     ax4[0].set_ylabel('wx [deg/s]',labelpad=-2), ax4[1].set_ylabel('wy [deg/s]',labelpad=-2), ax4[2].set_ylabel('wz [deg/s]',labelpad=-2)
     fig4.supxlabel(ts,fontsize='small')
-
+    
+    ax4[0].set_ylim(-10, 10), ax4[1].set_ylim(-10, 10), ax4[2].set_ylim(-10, 90)
+   
     grid = plt.GridSpec(3,1)
     create_subtitle(fig3, grid[0, ::], 'Actual vs Reference Angular Velocities')
 
@@ -275,6 +301,6 @@ if __name__ == "__main__":
     parser.add_argument("file_usd")
     parser.add_argument("controller")
     parser.add_argument("filename")
-    
+    parser.add_argument("--maxtime",type=float, default=10000)
     args = parser.parse_args()
     main(args)
