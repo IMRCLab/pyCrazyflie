@@ -500,7 +500,7 @@ class PlotandAnimate:
             if self.uavModel.pload:
                 xl, yl, zl  = self.getPayloadStates(i)
                 self.drawPayload(x[i], y[i], z[i], xl[i], yl[i], zl[i])
-                # self.drawPlTraj(xl, yl, zl)
+                self.drawPlTraj(xl, yl, zl)
                 r = 0.08
                 xsp, ysp, zsp = Sphere(xl, yl, zl, r)
                 self.ax.plot_surface(xl[i]+xsp, yl[i]+ysp, zl[i]+zsp, cmap=plt.cm.YlGnBu_r)

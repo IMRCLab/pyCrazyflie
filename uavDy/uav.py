@@ -83,8 +83,15 @@ class SharedPayload:
         self.mt_  = 0
         self.numOfquads = 0
         self.J_bar_term = np.zeros((3,3))
-
+        if payload_params['payloadLead'] in 'enabled':
+            self.lead = True
+        else: 
+            self.lead = False
+        self.controller = payload_params['ctrlLee']
+        self.cablegains = payload_params['cable_gains']
+        self.posFrload = np.empty((1,3))
         for name, uav in uavs_params.items():
+            self.posFrload = np.vstack((self.posFrload,np.array(uav['pos_fr_payload']).reshape((1,3))))
             self.mt_   += float(uav['m']) # Mass of quadrotors [kg] 
             self.J_bar_term += self.mt_ * skew(np.array(uav['pos_fr_payload']))@ skew(np.array(uav['pos_fr_payload']))
             self.numOfquads += 1
@@ -98,6 +105,8 @@ class SharedPayload:
             self.plSysDim -= 3
             self.plStateSize -= 7
             self.pointmass = True
+            self.posFrload = np.delete(self.posFrload, 0, 0)
+
         self.sys_dim    = self.plSysDim + 3*self.numOfquads
         self.state_size = self.plStateSize + 6*self.numOfquads #13 for the payload and (3+3)*n for each cable angle and its derivative    
         self.plstate = np.empty((1,16+3*self.numOfquads))
