@@ -222,7 +222,7 @@ def main(args):
     ax3[1].plot(time, np.degrees(rpydes[:,1]) ,lw=0.75, c='darkgreen',label='Reference')
     ax3[2].plot(time, np.degrees(rpydes[:,2]) ,lw=0.75, c='darkgreen',label='Reference')
  
-    ax3[0].set_ylim(-5, 5), ax3[1].set_ylim(-8, 8), ax3[2].set_ylim(-200, 200)
+    ax3[0].set_ylim(-15, 15), ax3[1].set_ylim(-15, 15), ax3[2].set_ylim(-200, 200)
 
     ax3[0].set_ylabel('r [deg]',labelpad=-2), ax3[1].set_ylabel('p [deg]',labelpad=-2), ax3[2].set_ylabel('y [deg]',labelpad=-2)
     fig3.supxlabel(ts,fontsize='small')
@@ -241,7 +241,7 @@ def main(args):
     ax4[0].set_ylabel('wx [deg/s]',labelpad=-2), ax4[1].set_ylabel('wy [deg/s]',labelpad=-2), ax4[2].set_ylabel('wz [deg/s]',labelpad=-2)
     fig4.supxlabel(ts,fontsize='small')
     
-    ax4[0].set_ylim(-10, 10), ax4[1].set_ylim(-10, 10), ax4[2].set_ylim(-10, 90)
+    ax4[0].set_ylim(-100, 100), ax4[1].set_ylim(-100, 100), ax4[2].set_ylim(-10, 90)
    
     grid = plt.GridSpec(3,1)
     create_subtitle(fig3, grid[0, ::], 'Actual vs Reference Angular Velocities')
