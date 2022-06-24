@@ -96,11 +96,6 @@ def main(args):
     logDataKeys = list(logData.keys())
     controller = args.controller
 
-
-   
-        
-
-
     if controller in 'sjc':
         ctrl = 'ctrlSJC.'
     elif controller in 'lee':
@@ -117,7 +112,7 @@ def main(args):
                      
     filename = args.filename
     print('Plotting...')
-    f = PdfPages(filename)
+    f = PdfPages(filename+'.pdf')
     
     plt.rcParams['axes.grid'] = True
     plt.rcParams['figure.max_open_warning'] = 100
@@ -221,8 +216,12 @@ def main(args):
     ax3[0].plot(time, np.degrees(rpydes[:,0]) ,lw=0.75, c='darkgreen',label='Reference')
     ax3[1].plot(time, np.degrees(rpydes[:,1]) ,lw=0.75, c='darkgreen',label='Reference')
     ax3[2].plot(time, np.degrees(rpydes[:,2]) ,lw=0.75, c='darkgreen',label='Reference')
- 
-    ax3[0].set_ylim(-15, 15), ax3[1].set_ylim(-15, 15), ax3[2].set_ylim(-200, 200)
+
+    max_x = abs(max(np.degrees(rpy[:,0]),key=abs))
+    max_y = abs(max(np.degrees(rpy[:,1]),key=abs))
+    max_z = abs(max(np.degrees(rpy[:,2]),key=abs))
+
+    ax3[0].set_ylim(-max_x, max_x), ax3[1].set_ylim(-max_y, max_y), ax3[2].set_ylim(-max_z, max_z)
 
     ax3[0].set_ylabel('r [deg]',labelpad=-2), ax3[1].set_ylabel('p [deg]',labelpad=-2), ax3[2].set_ylabel('y [deg]',labelpad=-2)
     fig3.supxlabel(ts,fontsize='small')
@@ -240,8 +239,10 @@ def main(args):
 
     ax4[0].set_ylabel('wx [deg/s]',labelpad=-2), ax4[1].set_ylabel('wy [deg/s]',labelpad=-2), ax4[2].set_ylabel('wz [deg/s]',labelpad=-2)
     fig4.supxlabel(ts,fontsize='small')
-    
-    ax4[0].set_ylim(-100, 100), ax4[1].set_ylim(-100, 100), ax4[2].set_ylim(-10, 90)
+    max_x = abs(max(np.degrees(angVel[:,0]),key=abs))
+    max_y = abs(max(np.degrees(angVel[:,1]),key=abs))
+    max_z = abs(max(np.degrees(angVel[:,2]),key=abs))
+    ax4[0].set_ylim(-max_x, max_x), ax4[1].set_ylim(-max_y, max_y), ax4[2].set_ylim(-max_z, max_z)
    
     grid = plt.GridSpec(3,1)
     create_subtitle(fig3, grid[0, ::], 'Actual vs Reference Angular Velocities')
