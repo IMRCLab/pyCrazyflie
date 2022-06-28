@@ -112,11 +112,14 @@ class SharedPayload:
         self.plstate = np.empty((1,16+3*self.numOfquads))
         self.plFullState = np.empty((1,16+3*self.numOfquads))
         self.ctrlInp = np.empty((1,3))
+        self.plref_state = np.empty((1,6))
         self.state = self.getInitState(uavs_params, payload_params)
         self.accl   = np.zeros(self.sys_dim,)
+        self.accl[0:3] = np.array([0,0,0]).reshape(3,)
+        self.i_error = np.zeros(3,)
+        self.qdi_prev = np.array([0,0,-1])
+        self.wdi_prev = np.array([0,0,0])
         
-       
-    
     def getInitState(self, uav_params, payload_params):
         self.state = np.zeros(self.state_size,)
         self.state[0:3]   = payload_params['init_pos_L']
@@ -174,8 +177,8 @@ class SharedPayload:
         term = np.zeros((3,))
         Mq   = self.mt*np.identity(3)
 
-        
-       
+
+
         for name, uav in uavs_params.items():
             m = float(uav['m'])
             l = float(uav['l_c'])
@@ -190,6 +193,7 @@ class SharedPayload:
             k+=3
             Nq[0:3]  -=  m*l*np.dot(wi,wi)*qi # Lee 2018
             Nq[i:i+3] = -m*skew(qi) @ np.array([0,0,-self.g]) # Lee 2018
+            # print('Nq:', Nq[i:i+3])
             if not self.pointmass:
                 Nq[0:3]  += m*R_p @ skew(wl) @skew(wl) @ posFrload
                 Nq[3:6]  += m*l*skew(posFrload) @ np.transpose(R_p)*(np.linalg.norm(wi))**2 @ qi
@@ -200,7 +204,7 @@ class SharedPayload:
         Nq[0:3] += Mq @ np.array([0,0,-self.g])
         if not self.pointmass:
             Nq[3:6] = -skew(wl)@self.J_bar@wl - Nq[3:6] + term
-        
+
         return Nq
 
 
@@ -222,12 +226,12 @@ class SharedPayload:
             k+=3
             qiqiT = qi.reshape((3,1))@(qi.T).reshape((1,3))
             u_inp[0:3] += qiqiT @ self.ctrlInp[i,:]
-            u_inp[j:j+3] = - skew(qi) @ (np.eye(3) - qiqiT) @  self.ctrlInp[i,:]
-
+            u_perp = ((np.eye(3) - qiqiT) @  self.ctrlInp[i,:])
+            u_inp[j:j+3] =  -skew(qi) @ u_perp
             if not self.pointmass:
                 u_inp[3:6] += skew(posFrload)@np.transpose(R_p) @ self.ctrlInp[i,:]
                 u_inp[j:j+3] += m * l * skew(qi) @ R_p @ skew(wl) @ skew(wl) @ posFrload
-           
+
             i+=1
             j+=3
         return u_inp
@@ -279,12 +283,11 @@ class SharedPayload:
 
     def stateEvolution(self,torques, uavs, uavs_params):
         torques = np.delete(torques, 0,0)
-    
         Bq    = self.getBq(uavs_params)
         Nq    = self.getNq(uavs_params)
         u_inp = self.getuinp(uavs_params)
-        velNext, posNext = self.getNextState(self.accl)
         self.accl = np.linalg.inv(Bq)@(Nq + u_inp)
+        velNext, posNext = self.getNextState(self.accl)
         self.state[0:3]   = posNext[0:3]
         self.state[3:6]   = velNext[0:3]
         if not self.pointmass:
@@ -324,12 +327,17 @@ class SharedPayload:
     
     def stackCtrl(self, ctrlInp):  
        self.ctrlInp = np.vstack((self.ctrlInp,ctrlInp))
-
+    
     def stackState(self):
-        self.plFullState  = np.vstack((self.plFullState, self.plstate)) 
-   
+        self.plFullState = np.vstack((self.plFullState, self.plstate)) 
+    
+    def stackStateandRef(self,plref_state):
+        self.plFullState = np.vstack((self.plFullState, self.plstate)) 
+        self.plref_state = np.vstack((self.plref_state, plref_state.reshape((1,6)))) 
+
     def cursorPlUp(self):
         self.plFullState = np.delete(self.plFullState, 0, 0)
+        self.plref_state = np.delete(self.plref_state, 0, 0)
 
     def cursorUp(self):
         self.ctrlInp = np.delete(self.ctrlInp, 0, 0)
@@ -413,6 +421,7 @@ class UavModel:
     
         return self.state
 
+        
     def stackStandCtrl(self, state, tau_inp, ref_state):
         ## This method stacks the actual and reference states of the UAV 
         ## and the control input vector [fz taux, tauy, tauz, f1, f2, f3, f4]
@@ -423,7 +432,11 @@ class UavModel:
         f_motors   = self.invAll @ tau_inp 
         self.ctrlInps   = np.vstack((self.ctrlInps, np.array([tau_inp, f_motors]).reshape(1,8)))
         self.refState   = np.vstack((self.refState, ref_state))
-   
+    
+    def cursorUpwPl(self):
+        self.fullState = np.delete(self.fullState, 0, 0)
+        self.ctrlInps  = np.delete(self.ctrlInps,  0, 0)
+
     def cursorUp(self):
         ## This method removes the first row of the stack which is initialized as an empty array
         self.fullState = np.delete(self.fullState, 0, 0)

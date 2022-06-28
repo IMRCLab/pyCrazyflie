@@ -70,20 +70,22 @@ RobotswithPayload:
     mode        : "shared" # shared: payload is shared between UAVs through cables,  otherwise: independent paylaod for each UAV
     m_p         : 0.01
     inertia    :  [0, 0, 0]
-    init_pos_L  : [0.91321, 0.240792, 0.699988] # [0.090768, 0.234859, 0.097903] #[0.91321, 0.240792,-0.800012]
+    init_pos_L  : [0.91321, 0.240792, 0.699988] # [0,0.000094,0] #[0.91321, 0.240792, 0.699988] # [0.090768, 0.234859, 0.097903] #[0.91321, 0.240792,-0.800012]
     init_linV_L : [0,   0,    0]
     init_angle  : [0,   0,    0]
     wl          : [0,   0,    0]
     payloadLead : 'enabled'
-    refTrajPath: "trajectoriescsv/circleTraj1.csv"
+    refTrajPath: "trajectoriescsv/circleTraj1.csv" #hover_01.csv
     ctrlLee:
-      kp: 20 #10  
-      kd: 18
+      kp: 4 #10  
+      kd: 2
       kr: 0.0055 #8.81
       kw: 0.0013 #2.54
     cable_gains:
-      kq: 10
-      kw: 5
+      kq: 25
+      kw: 3
+      ki: 0
+
   Robots:
     cf4: 
       type : "cf21"
@@ -93,14 +95,14 @@ RobotswithPayload:
       d    : 4e-3
       cft  : 0.005964552 
       drag : 0 # 0: do not include drag model, 1: include simple drag model
-      refTrajPath  : "trajectoriescsv/figure8.csv" 
+      refTrajPath  : " " #"trajectoriescsv/figure8.csv" 
       controller  : 
         name: 'lee' # lee, sjc
-        kp: 20 #10  
-        kd: 18
+        kp: 2.5 #10  
+        kd: 2
         kr: 0.0055 #8.81
         kw: 0.0013 #2.54
-      l_c  : 0.3  # Length of cable
+      l_c  : 0.4  # Length of cable
       q_dg : [0, 0, 0] #[0,-51.4298,0]   #[-39.8273,36.159552, 20.156] #[-45, 0, 0] #[-45, 0, 0] # [0, 0, 0]  # Initial angle between UAV and payload
       qd   : [0, 0, 0]  # Initial angle derivates between UAV and payload (i.e., of cables)
       pos_fr_payload: [0, 0, 0] #position vector of the cable on the load (i.e., zero vector means a point mass)
@@ -134,4 +136,5 @@ RobotswithPayload:
     #       init_linVel_Q   : [0,  0,  0]
     #       init_angVel_Q   : [0, 0, 0]
 ## TIME STEP 
-dt : 1e-3 
+dt : 1e-3
+simtime: 10.001e3
