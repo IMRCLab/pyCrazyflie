@@ -44,7 +44,8 @@ def setlimits(ax, full_state):
 def plotPayloadStates(payload, posq, tf_sim, shared):
     """This function plots the states of the payload"""
     full_state = payload.plFullState
-    if payload.lead:
+    
+    if shared and payload.lead:
         ref_state  = payload.plref_state
     # PL_states = [xl, vl, p, wl]
     fig8, ax11 = plt.subplots(3, 1)
@@ -66,8 +67,8 @@ def plotPayloadStates(payload, posq, tf_sim, shared):
     pos    = full_state[:,0:3]
     linVel = full_state[:,3:6]
 
-    if payload.lead:
-        fig13, ax16 = plt.subplots(2, 3, sharex=True ,sharey=True)
+    if shared and payload.lead:
+        fig13, ax16 = plt.subplots(2, 3, sharex=True)
         fig13.tight_layout()
     
         posdes    = ref_state[:,0:3]
@@ -86,14 +87,14 @@ def plotPayloadStates(payload, posq, tf_sim, shared):
 ###############################################################################################
    
     ax11[0].plot(time, pos[:,0], c='k', lw=0.75, label='Actual'), ax11[1].plot(time, pos[:,1], lw=0.75, c='k'), ax11[2].plot(time, pos[:,2], lw=0.75, c='k')
-    if payload.lead:
+    if shared and payload.lead:
         ax11[0].plot(time, posdes[:,0], lw=0.75, c='darkgreen',label='Reference'), ax11[1].plot(time, posdes[:,1], lw=0.75, c='darkgreen'), ax11[2].plot(time, posdes[:,2], lw=0.75, c='darkgreen')    
     ax11[0].set_ylabel('x [m]',), ax11[1].set_ylabel('y [m]'), ax11[2].set_ylabel('z [m]')
     ax11[0].legend()
     fig8.supxlabel(ts,fontsize='small')
 
     grid = plt.GridSpec(3,1)
-    if payload.lead:
+    if shared and payload.lead:
         create_subtitle(fig8, grid[0, ::], 'Actual vs References Payload Linear Velocities')
     else:
         create_subtitle(fig8, grid[0, ::], 'Actual Payload Linear Velocities')
@@ -101,14 +102,14 @@ def plotPayloadStates(payload, posq, tf_sim, shared):
 
    
     ax12[0].plot(time, linVel[:,0],lw=0.75, c='k', label='Actual'), ax12[1].plot(time, linVel[:,1],lw=0.75, c='k'), ax12[2].plot(time, linVel[:,2],lw=0.75, c='k')
-    if payload.lead:
+    if shared and payload.lead:
         ax12[0].plot(time, linVeldes[:,0],lw=0.75, c='darkgreen',label='Reference'), ax12[1].plot(time, linVeldes[:,1],lw=0.75, c='darkgreen'), ax12[2].plot(time, linVeldes[:,2],lw=0.75, c='darkgreen')
     ax12[0].set_ylabel('vx [m/s]'), ax12[1].set_ylabel('vy [m/s]'), ax12[2].set_ylabel('vz [m/s]')
     ax12[0].legend()
     fig9.supxlabel(ts,fontsize='small')
 
     grid = plt.GridSpec(3,1)
-    if payload.lead:
+    if shared and payload.lead:
         create_subtitle(fig9, grid[0, ::], 'Actual vs References Payload Linear Velocities')
     else:
         create_subtitle(fig9, grid[0, ::], 'Actual Payload Linear Velocities')
@@ -148,14 +149,14 @@ def plotPayloadStates(payload, posq, tf_sim, shared):
         norm_x[i] = np.linalg.norm(pos[i,:] - posq[i,:])
     ax15.plot(time, norm_x,c='k',lw=1, label='Norm')
     ax15.set_ylabel('||xq - xp||',labelpad=-2)    
-    ax15.set_ylim([-round(max(norm_x),7),round(max(norm_x),7)])
+    ax15.set_ylim([round(min(norm_x), 7),round(max(norm_x), 7)])
     fig12.supxlabel(ts,fontsize='small')
 
     grid = plt.GridSpec(3,1)
     create_subtitle(fig12, grid[0, ::], 'Diff between Quadrotor and Payload Positions (Norm)')
 
 ###################################################################################################
-    if payload.lead:
+    if shared and payload.lead:
         ax16[0,0].plot(time, poserr[:,0],c='r',lw=0.7), ax16[0,1].plot(time, poserr[:,1],c='r',lw=0.7), ax16[0,2].plot(time, poserr[:,2],c='r',lw=0.7)
         ax16[0,0].set_ylabel('ex [m/s]'), ax16[0,1].set_ylabel('ey [m/s]'), ax16[0,2].set_ylabel('ez [m/s]')
         
@@ -166,9 +167,10 @@ def plotPayloadStates(payload, posq, tf_sim, shared):
         grid = plt.GridSpec(2,3)
         create_subtitle(fig13, grid[0, ::], 'Positional errors')
         create_subtitle(fig13, grid[1, ::], 'Linear Velocities errors')
-
-    return fig8, fig9, fig10, fig11, fig12, fig13
-
+    if shared and payload.lead:
+        return fig8, fig9, fig10, fig11, fig12, fig13
+    else:
+        return fig8, fig9, fig10, fig11, fig12
 
 
 ###############################################################################################
@@ -195,13 +197,13 @@ def outputPlots(uavs, payloads, tf_sim, pdfName, shared):
         plt.rcParams['axes.grid'] = True
         plt.rcParams['figure.max_open_warning'] = 100
         
-        fig1, ax1 = plt.subplots(3, 1, sharex=True ,sharey=True)
+        fig1, ax1 = plt.subplots(3, 1, sharex=True)
         fig1.tight_layout()
         
-        fig2, ax2 = plt.subplots(3, 1, sharex=True, sharey=True)
+        fig2, ax2 = plt.subplots(3, 1, sharex=True)
         fig2.tight_layout()
 
-        fig3, ax3 = plt.subplots(3, 1, sharex=True ,sharey=True)
+        fig3, ax3 = plt.subplots(3, 1, sharex=True)
         fig3.tight_layout()
 
         fig4, ax4 = plt.subplots(2, 3, sharex=True ,sharey=True)
@@ -335,13 +337,15 @@ def outputPlots(uavs, payloads, tf_sim, pdfName, shared):
             if payload.lead:
                 plref_state  = payload.plref_state
                 posdespl    = plref_state[:,0:3]
-                ax10.plot3D(posdespl[:,0], posdespl[:,1] , posdespl[:,2],'darkgreen',ls='--')
+                ax10.plot3D(posdespl[:,0], posdespl[:,1] , posdespl[:,2],'darkgreen',ls='--',lw=1.5)
         ax10.legend()
         ax10 = setlimits(ax10, pos)
 
         if uav_.pload:
-            fig8, fig9, fig10, fig11, fig12, fig14 = plotPayloadStates(payload, pos, tf_sim, shared)
-    
+            if shared and payload.lead:
+                fig8, fig9, fig10, fig11, fig12, fig14 = plotPayloadStates(payload, pos, tf_sim, shared)
+            else:   
+                 fig8, fig9, fig10, fig11, fig12 = plotPayloadStates(payload, pos, tf_sim, shared)
         textfig.savefig(f, format='pdf', bbox_inches='tight')
         fig1.savefig(f, format='pdf', bbox_inches='tight')
         fig2.savefig(f, format='pdf', bbox_inches='tight')

@@ -89,6 +89,7 @@ class SharedPayload:
             self.lead = False
         self.controller = payload_params['ctrlLee']
         self.cablegains = payload_params['cable_gains']
+        self.ctrlType   = payload_params['payloadCtrl']
         self.posFrload = np.empty((1,3))
         for name, uav in uavs_params.items():
             self.posFrload = np.vstack((self.posFrload,np.array(uav['pos_fr_payload']).reshape((1,3))))
@@ -113,9 +114,8 @@ class SharedPayload:
         self.plFullState = np.empty((1,16+3*self.numOfquads))
         self.ctrlInp = np.empty((1,3))
         self.plref_state = np.empty((1,6))
-        self.state = self.getInitState(uavs_params, payload_params)
+        self.state, self.prevSt = self.getInitState(uavs_params, payload_params)
         self.accl   = np.zeros(self.sys_dim,)
-        self.accl[0:3] = np.array([0,0,0]).reshape(3,)
         self.i_error = np.zeros(3,)
         self.qdi_prev = np.array([0,0,-1])
         self.wdi_prev = np.array([0,0,0])
@@ -135,7 +135,8 @@ class SharedPayload:
             self.state[j+3*self.numOfquads:j+3+3*self.numOfquads] = initValues['qd']
             j+=3
         ctrlInp = np.empty((self.numOfquads,3))
-        return self.state
+        self.prevSt = self.state.copy()
+        return self.state, self.prevSt
 
     def getBq(self, uavs_params):
         Bq = np.zeros((self.sys_dim, self.sys_dim))
@@ -287,6 +288,7 @@ class SharedPayload:
         Nq    = self.getNq(uavs_params)
         u_inp = self.getuinp(uavs_params)
         self.accl = np.linalg.inv(Bq)@(Nq + u_inp)
+        self.prevSt = self.state.copy()
         velNext, posNext = self.getNextState(self.accl)
         self.state[0:3]   = posNext[0:3]
         self.state[3:6]   = velNext[0:3]

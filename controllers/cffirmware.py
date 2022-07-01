@@ -73,6 +73,7 @@ class control_t:
         
         self.thrustSI = 0
         self.torque = np.array([0,0,0])
+        self.u_all = np.zeros(3,)
         self.controlMode = None
 
 class state_t:
@@ -82,6 +83,8 @@ class state_t:
         self. attitudeQuaternion = quaternion_t()
         self.velocity = vec3_s()
         self.acc = vec3_s()
+        self.payload_pos = vec3_s()
+        self.payload_vel = vec3_s()
 
 def controllerLeeInit():
     pass
@@ -140,7 +143,7 @@ def computeWddot(m, R, curr_w, T, Td, Td_dot, dessnap):
     return np.array([-np.dot(ha, yb), np.dot(ha, xb), 0])
 
 def thrustCtrl(m, R ,refAcc, kpep, kvev):
-    FdI = refAcc + gravComp  - kpep - kvev
+    FdI = refAcc - kpep - kvev
     return (m * FdI.T @ R @ np.array([[0],[0],[1]]))[0,0], FdI
 
 def torqueCtrl(I, Rt, curr_w_, krer, kwew, Rd, des_w, des_wd):
@@ -192,6 +195,8 @@ def controllerLee(uavModel, control, setpoint, sensors, state, tick):
     
     return control, des_w.reshape(3,), des_wd.reshape(3,)
 
+def controllerLeePayloadInit():
+    pass
 def torqueCtrlwPayload(uavModel, fi, payload, setpoint, tick):
     kw      = payload.controller['kw']
     kr      = payload.controller['kr']
@@ -207,7 +212,8 @@ def torqueCtrlwPayload(uavModel, fi, payload, setpoint, tick):
     Rd =  computeDesiredRot(u,0)
     quatd = rn.from_matrix(Rd)
     Rtd = np.transpose(Rd)
-
+    psi = 0.5*np.trace(np.eye(3)-Rtd@R)
+    # print(round(psi,25), '                      ', round(tick,3))
     er       = 0.5 * flatten((Rtd @ R - Rt @ Rd)).reshape((3,1)) 
     curr_w   = uavModel.state[10::].reshape((3,1))
     curr_w_  = curr_w.reshape(3,) # reshape of omega for cross products
@@ -219,77 +225,64 @@ def torqueCtrlwPayload(uavModel, fi, payload, setpoint, tick):
     Td_dot  = np.dot(zb, m * dessnap) - np.dot(zb, np.cross(np.cross(des_w_, des_w_), np.dot(T, zb)))
     des_wd  = (computeWddot(m, R, des_w, T, Td, Td_dot, dessnap)).reshape(3,1)
     ew  = (curr_w - Rt @ Rd @ des_w).reshape((3,1))
-    torques =  torqueCtrl(I, Rt, curr_w_, kr*er, kw*ew, Rd, des_w, des_wd)
-
-   
+    torques =  torqueCtrl(I, Rt, curr_w_, kr*er, kw*ew, Rd, des_w, des_wd)   
     return torques, des_w, des_wd
 
 
-def parallelComp(virtualInp, uavs, payload):
+def parallelComp(virtualInp, uavModel, payload, j):
     ## This only includes the point mass model
     grav = np.array([0,0,-9.81])
-    acc0 = payload.accl[0:3] - grav
-    u_parallel =  np.zeros((3*payload.numOfquads))
-    i, k = 0, payload.plStateSize
-
-    for id in uavs.keys():
-        m   = uavs[id].m
-        l = uavs[id].lc
-        qi = payload.state[k:k+3]
-        wi = payload.state[k+3*payload.numOfquads:k+3+3*payload.numOfquads]
-        k+=3
-        qiqiT = qi.reshape((3,1))@(qi.T).reshape((1,3))
-        u_i_parallel = virtualInp[i:i+3] + m*l*((np.linalg.norm(wi))**2)*qi  +  m*qiqiT@acc0
-        u_parallel[i:i+3] = u_i_parallel
-        i+=3
+    acc_ = (payload.state[3:6] - payload.prevSt[3:6])/payload.dt
+    acc0 = acc_ - grav
+    m   = uavModel.m
+    l = uavModel.lc
+    qi = payload.state[j:j+3]
+    wi = payload.state[j+3*payload.numOfquads:j+3+3*payload.numOfquads]   
+    qiqiT = qi.reshape((3,1))@(qi.T).reshape((1,3))
+    u_parallel = virtualInp + m*l*((np.linalg.norm(wi))**2)*qi  +  m*qiqiT@acc0
     return u_parallel
 
-def perpindicularComp(desVirtInp, uavs, payload, kq, kw, ki):
+def perpindicularComp(desVirtInp, uavModel, payload, kq, kw, ki, j):
     ## This only includes the point mass model
     grav = np.array([0,0,-9.81])
-    acc0 = payload.accl[0:3] - grav
-    u_perp   = np.zeros_like(desVirtInp)
-    i,k = 0, payload.plStateSize
-    for id in uavs.keys():
-        qdi    = - desVirtInp[i:i+3]/ np.linalg.norm(desVirtInp[i:i+3])
-      
-        qdidot = (qdi - payload.qdi_prev)/payload.dt
-        payload.qdi_prev = qdi
-        
-        m   = uavs[id].m
-        l = uavs[id].lc
-        qi = payload.state[k:k+3]
-        wi = payload.state[k+3*payload.numOfquads:k+3+3*payload.numOfquads]
-        qidot = np.cross(wi, qi)
-        k+=3
-        # P part
-        eq = np.cross(qdi, qi)
-        wdi = np.cross(qdi, qdidot)
-        wdi = np.zeros(3,)
-        wdidot = (wdi - payload.wdi_prev)/payload.dt
-        payload.wdi_prev = wdi
-        
-        ew = wi + uav.skew(qi)*uav.skew(qi) @ wdi
-        
-        skewqi2 = (uav.skew(qi)@uav.skew(qi))
+    acc_ = (payload.state[3:6] - payload.prevSt[3:6])/payload.dt
+    acc0 = acc_ - grav
 
-        u_perp[i:i+3] = m * l  * uav.skew(qi) @ (- kq * eq - kw * ew - np.dot(qi, wdi)*qidot - skewqi2@wdidot) \
-            - m * skewqi2 @ acc0 
+    qdi    = - desVirtInp/ np.linalg.norm(desVirtInp)
+      
+    qdidot = (qdi - payload.qdi_prev)/payload.dt
+    payload.qdi_prev = qdi
         
+    m   = uavModel.m
+    l = uavModel.lc
+    qi = payload.state[j:j+3]
+    wi = payload.state[j+3*payload.numOfquads:j+3+3*payload.numOfquads]   
+    qidot = np.cross(wi, qi)
+    # P part
+    eq = np.cross(qdi, qi)
+    wdi = np.cross(qdi, qdidot)
+
+    skewqi2 = (uav.skew(qi)@uav.skew(qi))
+
+    ew = wi + skewqi2 @ wdi
+    
+    u_perp = m * l  * uav.skew(qi) @ (- kq * eq - kw * ew) - m * skewqi2 @ acc0 #  - np.dot(qi, wdi)*qidot - skewqi2@wdidot) \
+               
     return u_perp
 
-def payloadControllerLee(uavs, payload, control, setpoint, sensors, state, tick):
+def controllerLeePayload(uavModel, payload, control, setpoint, sensors, state, tick, j):
 
     kp      = payload.controller['kp']
     kd      = payload.controller['kd']
+    ki_p    = payload.controller['ki']
     kw      = payload.controller['kw']
     kr      = payload.controller['kr']
     kq      = payload.cablegains['kq']
     kwc     = payload.cablegains['kw']
     ki      = payload.cablegains['ki']
 
-    currPos = np.array([state.position.x, state.position.y, state.position.z]).reshape((3,1))
-    currVl  = np.array([state.velocity.x, state.velocity.y, state.velocity.z]).reshape((3,1))
+    currPos = np.array([state.payload_pos.x, state.payload_pos.y, state.payload_pos.z]).reshape((3,1))
+    currVl  = np.array([state.payload_vel.x, state.payload_vel.y, state.payload_vel.z]).reshape((3,1))
     desPos  = np.array([setpoint.position.x, setpoint.position.y, setpoint.position.z]).reshape((3,1))
     desVl   = np.array([setpoint.velocity.x, setpoint.velocity.y, setpoint.velocity.z]).reshape((3,1))    
     desAcc  = np.array([setpoint.acceleration.x, setpoint.acceleration.y, setpoint.acceleration.z]).reshape((3,1))
@@ -298,9 +291,11 @@ def payloadControllerLee(uavs, payload, control, setpoint, sensors, state, tick)
     
     ep = (currPos - desPos)
     ev = (currVl  - desVl)
+    payload.i_error = payload.i_error.reshape((3,1)) + payload.dt * ep
+    ei = payload.i_error.reshape((3,1))
     mp  = payload.mp 
     gravComp = np.array([0,0,9.81]).reshape((3,1))
-    Fd = mp * (- kp * ep - kd * ev + desAcc + gravComp)
+    Fd = mp * (- kp * ep - kd * ev + ki_p * ei + desAcc + gravComp)
     Md = np.zeros(3,)
     Rp = np.eye(3)
     rows = 3
@@ -308,40 +303,24 @@ def payloadControllerLee(uavs, payload, control, setpoint, sensors, state, tick)
     if not payload.pointmass: 
         rows = 6
     quadNums = payload.numOfquads
-    P = np.zeros((rows, 3*quadNums))
-    for i in range(0,3*quadNums, 3):
-        P[0:3, i:i+3] = np.eye(3) 
+    P = np.eye(3)
 
-    if not payload.pointmass:
-        ### This part to generate the desired moment inputs on the payload if it is a rigid body (still under development)
-        I = payload.J
-        posFrload = payload.posFrload
-        Rp = rn.to_matrix(payload.state[6:10])    
-        for i in range(0,quadNums):
-            P[3::, i:i+3] = uav.skew(posFrload[i,:])
-  
-    desVirtInp = (np.linalg.pinv(P) @ Fd).reshape(3,)
+    desVirtInp = (Fd).reshape(3,)
     k = payload.plStateSize
- 
 
-    virtualInp = np.zeros_like(desVirtInp)
-
-    for i in range(0,3*quadNums,3):
-        qi = payload.state[k:k+3]
-        desVinpi = desVirtInp[i:i+3]
-        k+=3
-        qiqiT = qi.reshape((3,1))@(qi.T).reshape((1,3))
-        virtualInp[i:i+3] =  qiqiT @ desVinpi  
-    u_parallel = parallelComp(virtualInp, uavs, payload)
-    u_perpind  = perpindicularComp(desVirtInp, uavs, payload, kq, kwc, ki)
+    qi = payload.state[j:j+3]
+    wi = payload.state[j+3*payload.numOfquads:j+3+3*payload.numOfquads]
+       
+    qiqiT = qi.reshape((3,1))@(qi.T).reshape((1,3))
+    virtualInp =  qiqiT @ desVirtInp  
+    u_parallel = parallelComp(virtualInp, uavModel, payload, j)
+    u_perpind  = perpindicularComp(desVirtInp, uavModel, payload, kq, kwc, ki, j)
     
-    u = u_parallel + u_perpind
-    i = 0
-    U = {}
-    for id in uavs.keys():
-        Re3 = rn.to_matrix(uavs[id].state[6:10])@ np.array([0,0,1])
-        u_i = u[i:i+3] 
-        control[id] = np.linalg.norm(u_i)
-        U[id] = u_i
-        i+=3
-    return control, U
+    control.u_all = u_parallel + u_perpind
+    R = rn.to_matrix(uavModel.state[6:10])
+    
+    Re3 = R@np.array([0,0,1])
+    
+    control.thrustSI = np.dot(control.u_all,Re3)
+    
+    return control
