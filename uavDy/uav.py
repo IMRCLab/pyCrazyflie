@@ -194,7 +194,6 @@ class SharedPayload:
             k+=3
             Nq[0:3]  -=  m*l*np.dot(wi,wi)*qi # Lee 2018
             Nq[i:i+3] = -m*skew(qi) @ np.array([0,0,-self.g]) # Lee 2018
-            # print('Nq:', Nq[i:i+3])
             if not self.pointmass:
                 Nq[0:3]  += m*R_p @ skew(wl) @skew(wl) @ posFrload
                 Nq[3:6]  += m*l*skew(posFrload) @ np.transpose(R_p)*(np.linalg.norm(wi))**2 @ qi

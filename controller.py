@@ -485,7 +485,8 @@ def main(args, animateOrPlotdict, params):
             
                 control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
                 torques  = np.vstack((torques, control_inp[1::].reshape(1,3)))
-                ctrlInp  = np.array([control.u_all[0], control.u_all[1], control.u_all[2]]) 
+                Re3 = rn.to_matrix(uavs[id].state[6:10])@np.array([0,0,1])
+                ctrlInp  =  np.array([control.u_all[0], control.u_all[1], control.u_all[2]])
                 payload.stackCtrl(ctrlInp.reshape(1,3))  
                 if not payload.lead:
                     controls[id]  = control

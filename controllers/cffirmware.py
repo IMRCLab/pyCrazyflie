@@ -197,6 +197,7 @@ def controllerLee(uavModel, control, setpoint, sensors, state, tick):
 
 def controllerLeePayloadInit():
     pass
+
 def torqueCtrlwPayload(uavModel, fi, payload, setpoint, tick):
     kw      = payload.controller['kw']
     kr      = payload.controller['kr']
@@ -205,15 +206,12 @@ def torqueCtrlwPayload(uavModel, fi, payload, setpoint, tick):
     R = rn.to_matrix(uavModel.state[6:10])
     Rt = R.T
     u = fi*R@np.array([0,0,1])
-    
-    # print(u, tick)
     m = uavModel.m
     I = uavModel.I
     Rd =  computeDesiredRot(u,0)
     quatd = rn.from_matrix(Rd)
     Rtd = np.transpose(Rd)
     psi = 0.5*np.trace(np.eye(3)-Rtd@R)
-    # print(round(psi,25), '                      ', round(tick,3))
     er       = 0.5 * flatten((Rtd @ R - Rt @ Rd)).reshape((3,1)) 
     curr_w   = uavModel.state[10::].reshape((3,1))
     curr_w_  = curr_w.reshape(3,) # reshape of omega for cross products
@@ -227,7 +225,6 @@ def torqueCtrlwPayload(uavModel, fi, payload, setpoint, tick):
     ew  = (curr_w - Rt @ Rd @ des_w).reshape((3,1))
     torques =  torqueCtrl(I, Rt, curr_w_, kr*er, kw*ew, Rd, des_w, des_wd)   
     return torques, des_w, des_wd
-
 
 def parallelComp(virtualInp, uavModel, payload, j):
     ## This only includes the point mass model
@@ -263,7 +260,7 @@ def perpindicularComp(desVirtInp, uavModel, payload, kq, kw, ki, j):
     wdi = np.cross(qdi, qdidot)
 
     skewqi2 = (uav.skew(qi)@uav.skew(qi))
-
+    # D part
     ew = wi + skewqi2 @ wdi
     
     u_perp = m * l  * uav.skew(qi) @ (- kq * eq - kw * ew) - m * skewqi2 @ acc0 #  - np.dot(qi, wdi)*qidot - skewqi2@wdidot) \

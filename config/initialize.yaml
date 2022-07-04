@@ -138,4 +138,4 @@ RobotswithPayload:
     #       init_angVel_Q   : [0, 0, 0]
 ## TIME STEP 
 dt : 1e-3
-simtime: 2.001e3
+simtime: 5.001e3
