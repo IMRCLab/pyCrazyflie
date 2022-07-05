@@ -43,20 +43,20 @@ def setlimits(ax, full_state):
     ax.set_zlabel('Z')
     return ax
 
-def preparefigs():
-    fig1, ax1 = plt.subplots(3, 1, sharex=True ,sharey=True)
+def preparefigs(powerDist):
+    fig1, ax1 = plt.subplots(3, 1, sharex=True)
     fig1.tight_layout()
     
-    fig2, ax2 = plt.subplots(3, 1, sharex=True, sharey=True)
+    fig2, ax2 = plt.subplots(3, 1, sharex=True)
     fig2.tight_layout()
 
-    fig3, ax3 = plt.subplots(3, 1, sharex=True ,sharey=True)
+    fig3, ax3 = plt.subplots(3, 1, sharex=True)
     fig3.tight_layout()
 
-    fig4, ax4 = plt.subplots(3, 1, sharex=True ,sharey=True)
+    fig4, ax4 = plt.subplots(3, 1, sharex=True)
     fig4.tight_layout()
 
-    fig5, ax5 = plt.subplots(2, 3, sharex=True ,sharey=True)
+    fig5, ax5 = plt.subplots(2, 3, sharex=True)
     fig5.tight_layout()
 
     fig6 = plt.figure(constrained_layout=True)
@@ -68,13 +68,28 @@ def preparefigs():
     
     fig7 = plt.figure(figsize=(10,10))
     ax10 = fig7.add_subplot(autoscale_on=True,projection="3d")
-
-    return fig1, ax1, fig2, ax2, fig3, ax3, fig4, ax4, fig5, ax5, fig6, gs, ax6, ax7, ax8, ax9, fig7, ax10
+    if powerDist:
+        fig8, ax11 =  plt.subplots(5, 1)
+        fig8.tight_layout()
+        return fig1, ax1, fig2, ax2, fig3, ax3, fig4, ax4, fig5, ax5, fig6, gs, ax6, ax7, ax8, ax9, fig7, ax10, fig8, ax11
+    else:
+        return fig1, ax1, fig2, ax2, fig3, ax3, fig4, ax4, fig5, ax5, fig6, gs, ax6, ax7, ax8, ax9, fig7, ax10
 
 def main(args):
     # decode binary log data
     logData = cfusdlog.decode(args.file_usd)['fixedFrequency']
- 
+    time = np.column_stack(logData['timestamp']/1000).flatten()
+    time = time - time[0]
+
+    if maxtime > time[-1]:
+        maxtime = time[-1]
+        time = time[0::]
+    else:
+        idx, value = find_nearest(time, maxtime)
+        time = time[0:idx+1]
+        for id in logData.keys():
+            logData[id] = logData[id][0:idx+1]
+
     logDataKeys = list(logData.keys())
     controller = args.controller
 
@@ -157,20 +172,50 @@ def main(args):
         logData['ctrlSJC.qrx'],
         logData['ctrlSJC.qry'],
         logData['ctrlSJC.qrz']))
-    
-        
+    powerDist = False
+    if 'powerDist.' in  (' ').join(logData.keys()):
+        powerDist = True
+        thrust = np.column_stack((
+        logData['powerDist.thrustPart']/(100)
+        )).reshape(time.shape) 
 
+        roll   = np.column_stack((
+        logData['powerDist.rollPart']/(100)
+        )).reshape(time.shape) 
+
+        pitch  = np.column_stack((
+        logData['powerDist.pitchPart']/(100)
+        )).reshape(time.shape) 
+
+        yaw    = np.column_stack((
+        logData['powerDist.yawPart']/(100)
+        )).reshape(time.shape) 
+
+        maxTh  = np.column_stack((
+        logData['powerDist.maxThrust']/(100)
+        )).reshape(time.shape) 
+
+        motorForces = np.row_stack(( 
+        thrust - roll - pitch + yaw,
+        thrust - roll + pitch - yaw,
+        thrust + roll + pitch + yaw,
+        thrust + roll - pitch - yaw
+        )).T
+
+      
     poserr = (posdes[:,:] - pos[:,:]).reshape(len(pos),3)
     linVerr = (linVeldes[:,:] - linVel[:,:]).reshape(len(pos),3) 
 
 
     ts = 'time [s]'
-    time = np.column_stack(logData['timestamp']/1000).reshape(len(pos),)
-    time = time - time[0]
-    fig1, ax1, fig2, ax2, fig3, ax3, fig4, ax4, fig5, ax5, \
-    fig6, gs, ax6, ax7, ax8, ax9, fig7 , ax10\
-     = preparefigs()
-    
+    if powerDist:
+        fig1, ax1, fig2, ax2, fig3, ax3, fig4, ax4, fig5, ax5, \
+        fig6, gs, ax6, ax7, ax8, ax9, fig7, ax10, fig8, ax11\
+        = preparefigs(powerDist)
+    else:
+        fig1, ax1, fig2, ax2, fig3, ax3, fig4, ax4, fig5, ax5, \
+        fig6, gs, ax6, ax7, ax8, ax9, fig7, ax10\
+        = preparefigs(powerDist)
 
     ax1[0].plot(time, pos[:,0], c='k', lw=0.75,label='Actual'), ax1[1].plot(time, pos[:,1], lw=0.75, c='k'), ax1[2].plot(time, pos[:,2], lw=0.75, c='k')
     ax1[0].plot(time, posdes[:,0], lw=0.75, c='darkgreen',label='Reference'), ax1[1].plot(time, posdes[:,1], lw=0.75, c='darkgreen'), ax1[2].plot(time, posdes[:,2], lw=0.75, c='darkgreen')
@@ -193,12 +238,12 @@ def main(args):
     create_subtitle(fig2, grid[0, ::], 'Actual vs Reference Linear Velocities')
 
     ###################################
-    ax3[0].plot(time, np.degrees(rpy[:,0]), c='k',lw=0.75,label='Actual')
-    ax3[1].plot(time, np.degrees(rpy[:,1]), c='k',lw=0.75,label='Actual')
-    ax3[2].plot(time, np.degrees(rpy[:,2]), c='k',lw=0.75,label='Actual')
-    ax3[0].plot(time, np.degrees(rpydes[:,0]) ,lw=0.75, c='darkgreen',label='Reference')
-    ax3[1].plot(time, np.degrees(rpydes[:,1]) ,lw=0.75, c='darkgreen',label='Reference')
-    ax3[2].plot(time, np.degrees(rpydes[:,2]) ,lw=0.75, c='darkgreen',label='Reference')
+    ax3[0].plot(time, np.degrees(rpy[:,0]), c='k',lw=0.5,label='Actual')
+    ax3[1].plot(time, np.degrees(rpy[:,1]), c='k',lw=0.5,label='Actual')
+    ax3[2].plot(time, np.degrees(rpy[:,2]), c='k',lw=0.5,label='Actual')
+    ax3[0].plot(time, np.degrees(rpydes[:,0]) ,lw=0.5, c='darkgreen',label='Reference')
+    ax3[1].plot(time, np.degrees(rpydes[:,1]) ,lw=0.5, c='darkgreen',label='Reference')
+    ax3[2].plot(time, np.degrees(rpydes[:,2]) ,lw=0.5, c='darkgreen',label='Reference')
 
     ax3[0].set_ylabel('r [deg]',labelpad=-2), ax3[1].set_ylabel('p [deg]',labelpad=-2), ax3[2].set_ylabel('y [deg]',labelpad=-2)
     fig3.supxlabel(ts,fontsize='small')
@@ -207,25 +252,29 @@ def main(args):
     create_subtitle(fig3, grid[0, ::], 'Actual vs Reference Angular Velocities')
 
     ###################################
-    ax4[0].plot(time, np.degrees(angVel[:,0]), c='k',lw=0.75,label='Actual')
-    ax4[1].plot(time, np.degrees(angVel[:,1]), c='k',lw=0.75,label='Actual')
-    ax4[2].plot(time, np.degrees(angVel[:,2]), c='k',lw=0.75,label='Actual')
-    ax4[0].plot(time, np.degrees(angVeldes[:,0]), lw=0.75, c='darkgreen',label='Reference')
-    ax4[1].plot(time, np.degrees(angVeldes[:,1]), lw=0.75, c='darkgreen',label='Reference')
-    ax4[2].plot(time, np.degrees(angVeldes[:,2]), lw=0.75, c='darkgreen',label='Reference')
+    ax4[0].plot(time, np.degrees(angVel[:,0]), c='k',lw=0.5,label='Actual')
+    ax4[1].plot(time, np.degrees(angVel[:,1]), c='k',lw=0.5,label='Actual')
+    ax4[2].plot(time, np.degrees(angVel[:,2]), c='k',lw=0.5,label='Actual')
+    ax4[0].plot(time, np.degrees(angVeldes[:,0]), lw=0.5, c='darkgreen',label='Reference')
+    ax4[1].plot(time, np.degrees(angVeldes[:,1]), lw=0.5, c='darkgreen',label='Reference')
+    ax4[2].plot(time, np.degrees(angVeldes[:,2]), lw=0.5, c='darkgreen',label='Reference')
 
     ax4[0].set_ylabel('wx [deg/s]',labelpad=-2), ax4[1].set_ylabel('wy [deg/s]',labelpad=-2), ax4[2].set_ylabel('wz [deg/s]',labelpad=-2)
     fig4.supxlabel(ts,fontsize='small')
-
+    max_x = abs(max(np.degrees(angVel[:,0]),key=abs))
+    max_y = abs(max(np.degrees(angVel[:,1]),key=abs))
+    max_z = abs(max(np.degrees(angVel[:,2]),key=abs))
+    # ax4[0].set_ylim(-max_x, max_x), ax4[1].set_ylim(-max_y, max_y), ax4[2].set_ylim(-max_z, max_z)
+   
     grid = plt.GridSpec(3,1)
     create_subtitle(fig3, grid[0, ::], 'Actual vs Reference Angular Velocities')
 
     ###################################
 
-    ax5[0,0].plot(time, poserr[:,0],c='r',lw=0.7), ax5[0,1].plot(time, poserr[:,1],c='r',lw=0.7), ax5[0,2].plot(time, poserr[:,2],c='r',lw=0.7)
-    ax5[0,0].set_ylabel('ex [m/s]'), ax5[0,1].set_ylabel('ey [m/s]'), ax5[0,2].set_ylabel('ez [m/s]')
+    ax5[0,0].plot(time, poserr[:,0],c='r',lw=0.5), ax5[0,1].plot(time, poserr[:,1],c='r',lw=0.5), ax5[0,2].plot(time, poserr[:,2],c='r',lw=0.5)
+    ax5[0,0].set_ylabel('ex [m]'), ax5[0,1].set_ylabel('ey [m]'), ax5[0,2].set_ylabel('ez [m]')
     
-    ax5[1,0].plot(time, linVerr[:,0],c='r',lw=0.7), ax5[1,1].plot(time, linVerr[:,1],c='r',lw=0.7), ax5[1,2].plot(time, linVerr[:,2],c='r',lw=0.7)
+    ax5[1,0].plot(time, linVerr[:,0],c='r',lw=0.5), ax5[1,1].plot(time, linVerr[:,1],c='r',lw=0.5), ax5[1,2].plot(time, linVerr[:,2],c='r',lw=0.5)
     ax5[1,0].set_ylabel('vex [m/s]'), ax5[1,1].set_ylabel('vey [m/s]'), ax5[1,2].set_ylabel('vez [m/s]')
     fig5.supxlabel(ts,fontsize='small')
 
@@ -235,10 +284,10 @@ def main(args):
     
     ###################################
 
-    ax6.plot(time, cont_stack[:,0],lw=0.8, c='darkblue')
+    ax6.plot(time, cont_stack[:,0],lw=0.5, c='darkblue')
     ax6.set_ylabel('fz [N]')
     
-    ax7.plot(time, cont_stack[:,1], lw=0.8, c='darkblue'), ax8.plot(time, cont_stack[:,2], lw=0.8, c='darkblue'), ax9.plot(time, cont_stack[:,3],lw=0.8, c='darkblue')
+    ax7.plot(time, cont_stack[:,1], lw=0.5, c='darkblue'), ax8.plot(time, cont_stack[:,2], lw=0.5, c='darkblue'), ax9.plot(time, cont_stack[:,3],lw=0.5, c='darkblue')
     ax7.set_ylabel('taux [N.m]',fontsize='small'), ax8.set_ylabel('tauy [N.m]',fontsize='small'), ax9.set_ylabel('tauz [N.m]',fontsize='small')
     fig6.supxlabel(ts,fontsize='small')
 
@@ -246,11 +295,41 @@ def main(args):
     create_subtitle(fig6, gs[::, 1], 'Torque Control Input')
 
     ###################################
-    ax10.plot3D(pos[:,0], pos[:,1], pos[:,2], 'k-.',lw=1.5, label="Actual Trajectory")
-    ax10.plot3D(posdes[:,0], posdes[:,1] , posdes[:,2],'darkgreen',ls='--',lw=1.5,label="Reference Trajectory")
+    ax10.plot3D(pos[:,0], pos[:,1], pos[:,2], 'k-.',lw=1, label="Actual Trajectory")
+    ax10.plot3D(posdes[:,0], posdes[:,1] , posdes[:,2],'darkgreen',ls='--',lw=1,label="Reference Trajectory")
     ax10.legend()
     ax10 = setlimits(ax10, pos)
    ################################### 
+    if powerDist:
+        ax11[0].plot(time,thrust, c='k',lw=0.5), 
+        ax11[0].set_ylabel('thrust [g]')        
+        ax11[1].plot(time, pitch, c='k',lw=0.5)
+        ax11[1].set_ylabel('pitch [g]')        
+        ax11[2].plot(time, roll, c='k',lw=0.5)
+        ax11[2].set_ylabel('roll [g]')        
+        ax11[3].plot(time, yaw, c='k',lw=0.5)
+        ax11[3].set_ylabel('yaw [g]')        
+
+        ax11[4].plot(time, motorForces[:,0],c='m',lw=0.5, label='m1')
+        ax11[4].plot(time, motorForces[:,1],c='b',lw=0.5, label='m2')
+        ax11[4].plot(time, motorForces[:,2],c='g',lw=0.5, label='m3')
+        ax11[4].plot(time, motorForces[:,3],c='k',lw=0.5, label='m4')
+        ax11[4].plot(time, maxTh, c='r', lw=0.9, label='MAX_T')
+        print(maxTh[-1])
+        ax11[4].set_ylabel('F [g]')        
+
+        fig8.supxlabel(ts,fontsize='small')
+
+        grid = plt.GridSpec(5,1)
+        create_subtitle(fig8, grid[0, ::], 'Thrust')
+        create_subtitle(fig8, grid[1, ::], 'Pitch')
+        create_subtitle(fig8, grid[2, ::], 'roll')
+        create_subtitle(fig8, grid[3, ::], 'Yaw')
+        create_subtitle(fig8, grid[4, ::], 'Motor Forces')
+        
+
+
+   ###################################
     if controller in 'lee':
         txt = 'Kp = [{:.2f},{:.2f},{:.2f}]\n \
         Kd = [{:.2f},{:.2f},{:.2f}]\n \
@@ -267,6 +346,8 @@ def main(args):
     fig4.savefig(f, format='pdf', bbox_inches='tight')  
     fig5.savefig(f, format='pdf', bbox_inches='tight')  
     fig6.savefig(f, format='pdf', bbox_inches='tight')  
+    if powerDist:
+        fig8.savefig(f, format='pdf', bbox_inches='tight')      
     fig7.savefig(f, format='pdf', bbox_inches='tight')
     f.close()
 
