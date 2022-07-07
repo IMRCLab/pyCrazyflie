@@ -43,7 +43,12 @@ def setlimits(ax, full_state):
     ax.set_zlabel('Z')
     return ax
 
-def preparefigs(powerDist):
+def find_nearest(a, a0):
+    "Element in nd array `a` closest to the scalar value `a0`"
+    idx = np.abs(a - a0).argmin()
+    return idx, a.flat[idx]
+
+def preparefigs(powerDist, controller):
     fig1, ax1 = plt.subplots(3, 1, sharex=True)
     fig1.tight_layout()
     
@@ -71,13 +76,21 @@ def preparefigs(powerDist):
     if powerDist:
         fig8, ax11 =  plt.subplots(5, 1)
         fig8.tight_layout()
+    elif not powerDist and controller == 'leep':
+        fig8, ax11 =  plt.subplots(3, 1)
+        fig8.tight_layout()
         return fig1, ax1, fig2, ax2, fig3, ax3, fig4, ax4, fig5, ax5, fig6, gs, ax6, ax7, ax8, ax9, fig7, ax10, fig8, ax11
-    else:
+    elif not powerDist and controller == 'lee':
         return fig1, ax1, fig2, ax2, fig3, ax3, fig4, ax4, fig5, ax5, fig6, gs, ax6, ax7, ax8, ax9, fig7, ax10
+    elif not powerDist and controller == 'leep':
+        return fig1, ax1, fig2, ax2, fig3, ax3, fig4, ax4, fig5, ax5, fig6, gs, ax6, ax7, ax8, ax9, fig7, ax10, fig8, ax11
 
 def main(args):
     # decode binary log data
+    maxtime = args.maxtime
     logData = cfusdlog.decode(args.file_usd)['fixedFrequency']
+    # print(logData.keys())
+    # exit()
     time = np.column_stack(logData['timestamp']/1000).flatten()
     time = time - time[0]
 
@@ -93,9 +106,9 @@ def main(args):
     logDataKeys = list(logData.keys())
     controller = args.controller
 
-    if controller in 'sjc':
+    if controller == 'sjc':
         ctrl = 'ctrlSJC.'
-    elif controller in 'lee':
+    elif controller == 'lee':
         ctrl = 'ctrlLee.'
         Kpxy = logData['ctrlLee.Kpos_Px'][0]
         Kpz  = logData['ctrlLee.Kpos_Pz'][0]
@@ -106,15 +119,27 @@ def main(args):
         Krz  = logData['ctrlLee.KR_z'][0]
         Kwxy = logData['ctrlLee.Kw_x'][0]
         Kwz  = logData['ctrlLee.Kw_z'][0]             
-                     
+    elif controller == 'leep':
+        ctrl = 'ctrlLeeP.' 
+        Kpxy = logData['ctrlLeeP.Kpos_Px'][0]
+        Kpz  = logData['ctrlLeeP.Kpos_Pz'][0]
+        Kdxy = logData['ctrlLeeP.Kpos_Dx'][0]
+        Kdz  = logData['ctrlLeeP.Kpos_Dz'][0]
+
+        Kqxy = logData['ctrlLeeP.Kqx'][0]
+        Kqz  = logData['ctrlLeeP.Kqz'][0]
+        Kwxy = logData['ctrlLeeP.Kwx'][0]
+        Kwz  = logData['ctrlLeeP.Kwz'][0]
+
+
     filename = args.filename
     print('Plotting...')
-    f = PdfPages(filename)
+    f = PdfPages(filename+'.pdf')
     
     plt.rcParams['axes.grid'] = True
     plt.rcParams['figure.max_open_warning'] = 100
 
-    pos = np.column_stack((
+    posq = np.column_stack((
     logData['stateEstimateZ.x'] / 1000.0,
     logData['stateEstimateZ.y'] / 1000.0,
     logData['stateEstimateZ.z'] / 1000.0))
@@ -123,12 +148,43 @@ def main(args):
     logData['stateEstimateZ.vx'] / 1000.0,
     logData['stateEstimateZ.vy'] / 1000.0,
     logData['stateEstimateZ.vz'] / 1000.0))
+    if controller == 'leep':
+        posp = np.column_stack((
+        logData['stateEstimateZ.px'] / 1000.0,
+        logData['stateEstimateZ.py'] / 1000.0,
+        logData['stateEstimateZ.pz'] / 1000.0))
 
-    
+        linVelp = np.column_stack((
+        logData['stateEstimateZ.pvx'] / 1000.0,
+        logData['stateEstimateZ.pvy'] / 1000.0,
+        logData['stateEstimateZ.pvz'] / 1000.0))
+        
+        ui = np.column_stack((
+        logData['ctrlLeeP.ux'],
+        logData['ctrlLeeP.uy'],
+        logData['ctrlLeeP.uz']))
+
+        normq = (np.linalg.norm((posp-posq), axis=1)).reshape(len(posp),1)
+        normq = np.repeat(normq, 3, axis=1)
+        qi = np.divide((posp-posq), normq)
+        alpha = 0.01
+        linVelp_est = np.zeros_like(linVelp)
+        qi_dot_prev = np.zeros(3,)
+        linVelp_est[0,:] = linVel[0,:]
+        for i in range(0, len(time)-1):
+            qi_prev = qi[i,:]
+            qi_curr = qi[i+1,:]
+            dt = time[i+1] - time[i]
+            qidot = (qi_curr - qi_prev)/dt 
+            qidotfilt =  (1-alpha)*qi_dot_prev + alpha * qidot
+            qi_dot_prev = qidotfilt
+            linvp = linVel[i,:] + 0.453*qidotfilt
+            linVelp_est[i+1,:] = linvp
+ 
     posdes = np.column_stack((
     logData['ctrltargetZ.x'] / 1000.0,
     logData['ctrltargetZ.y'] / 1000.0,
-    logData['ctrltargetZ.z'] / 1000.0))
+    logData['ctrltargetZ.z'] / 1000.0 - 0.45))
 
     linVeldes = np.column_stack((
     logData['ctrltargetZ.vx'] / 1000.0,
@@ -151,18 +207,18 @@ def main(args):
     logData[ctrl+'torquey'] ,
     logData[ctrl+'torquez'] ))
  
-    if controller in 'lee':
+    if controller == 'lee' or controller == 'leep':
         rpydes = np.column_stack((
-        logData['ctrlLee.rpydx'],
-        logData['ctrlLee.rpydy'],
-        logData['ctrlLee.rpydz']))
+        logData[ctrl+'rpydx'],
+        logData[ctrl+'rpydy'],
+        logData[ctrl+'rpydz']))
         
         rpy = np.column_stack((
-        logData['ctrlLee.rpyx'],
-        logData['ctrlLee.rpyy'],
-        logData['ctrlLee.rpyz']))
+        logData[ctrl+'rpyx'],
+        logData[ctrl+'rpyy'],
+        logData[ctrl+'rpyz']))
         
-    elif controller in 'sjc':
+    elif controller == 'sjc':
         rpydes = np.column_stack((
         logData['ctrlSJC.qx'],
         logData['ctrlSJC.qy'],
@@ -172,6 +228,7 @@ def main(args):
         logData['ctrlSJC.qrx'],
         logData['ctrlSJC.qry'],
         logData['ctrlSJC.qrz']))
+
     powerDist = False
     if 'powerDist.' in  (' ').join(logData.keys()):
         powerDist = True
@@ -202,22 +259,30 @@ def main(args):
         thrust + roll - pitch - yaw
         )).T
 
-      
-    poserr = (posdes[:,:] - pos[:,:]).reshape(len(pos),3)
-    linVerr = (linVeldes[:,:] - linVel[:,:]).reshape(len(pos),3) 
-
-
+    if controller == 'lee' or controller == 'sjc':
+        poserr = (posdes[:,:] - posq[:,:]).reshape(len(posq),3)
+        linVerr = (linVeldes[:,:] - linVel[:,:]).reshape(len(posq),3) 
+    elif controller == 'leep':
+        poserr = (posdes[:,:] - posp[:,:]).reshape(len(posp),3)
+        linVerr = (linVeldes[:,:] - linVel[:,:]).reshape(len(posp),3)
     ts = 'time [s]'
     if powerDist:
         fig1, ax1, fig2, ax2, fig3, ax3, fig4, ax4, fig5, ax5, \
         fig6, gs, ax6, ax7, ax8, ax9, fig7, ax10, fig8, ax11\
-        = preparefigs(powerDist)
-    else:
+        = preparefigs(powerDist, controller)
+    elif not powerDist and controller == 'lee':
         fig1, ax1, fig2, ax2, fig3, ax3, fig4, ax4, fig5, ax5, \
         fig6, gs, ax6, ax7, ax8, ax9, fig7, ax10\
-        = preparefigs(powerDist)
+        = preparefigs(powerDist, controller)
+    elif not powerDist and controller == 'leep':
+        fig1, ax1, fig2, ax2, fig3, ax3, fig4, ax4, fig5, ax5, \
+        fig6, gs, ax6, ax7, ax8, ax9, fig7, ax10, fig8, ax11\
+        = preparefigs(powerDist, controller)
 
-    ax1[0].plot(time, pos[:,0], c='k', lw=0.75,label='Actual'), ax1[1].plot(time, pos[:,1], lw=0.75, c='k'), ax1[2].plot(time, pos[:,2], lw=0.75, c='k')
+
+    ax1[0].plot(time, posq[:,0], c='k', lw=0.75,label='Actual of UAV'), ax1[1].plot(time, posq[:,1], lw=0.75, c='k'), ax1[2].plot(time, posq[:,2], lw=0.75, c='k')
+    if controller == 'leep':
+        ax1[0].plot(time, posp[:,0], c='b', lw=0.75,label='Actual'), ax1[1].plot(time, posp[:,1], lw=0.75, c='b'), ax1[2].plot(time, posp[:,2], lw=0.75, c='b')
     ax1[0].plot(time, posdes[:,0], lw=0.75, c='darkgreen',label='Reference'), ax1[1].plot(time, posdes[:,1], lw=0.75, c='darkgreen'), ax1[2].plot(time, posdes[:,2], lw=0.75, c='darkgreen')
     ax1[0].set_ylabel('x [m]',), ax1[1].set_ylabel('y [m]'), ax1[2].set_ylabel('z [m]')
     ax1[0].legend()
@@ -228,7 +293,11 @@ def main(args):
 
     ###################################
     
-    ax2[0].plot(time, linVel[:,0],lw=0.75, c='k' ,label='Actual'), ax2[1].plot(time, linVel[:,1],lw=0.75, c='k'), ax2[2].plot(time, linVel[:,2],lw=0.75, c='k')
+    ax2[0].plot(time, linVel[:,0],lw=0.75, c='k' ,label='Actual UAV'), ax2[1].plot(time, linVel[:,1],lw=0.75, c='k'), ax2[2].plot(time, linVel[:,2],lw=0.75, c='k')
+    if controller == 'leep':
+        ax2[0].plot(time, linVelp[:,0], c='b', lw=0.75,label='Actual filt vel'), ax2[1].plot(time, linVelp[:,1], lw=0.75, c='b'), ax2[2].plot(time, linVelp[:,2], lw=0.75, c='b')
+        # ax2[0].plot(time, linVelp_est[:,0], c='m', lw=0.75,label='Actual filt q'), ax2[1].plot(time, linVelp_est[:,1], lw=.75, c='m'), ax2[2].plot(time, linVelp_est[:,2], lw=.75, c='m')
+
     ax2[0].plot(time, linVeldes[:,0],lw=0.75, c='darkgreen',label='Reference'), ax2[1].plot(time, linVeldes[:,1],lw=0.75, c='darkgreen'), ax2[2].plot(time, linVeldes[:,2],lw=0.75, c='darkgreen')
     ax2[0].set_ylabel('vx [m/s]'), ax2[1].set_ylabel('vy [m/s]'), ax2[2].set_ylabel('vz [m/s]')
     ax2[0].legend()
@@ -295,10 +364,10 @@ def main(args):
     create_subtitle(fig6, gs[::, 1], 'Torque Control Input')
 
     ###################################
-    ax10.plot3D(pos[:,0], pos[:,1], pos[:,2], 'k-.',lw=1, label="Actual Trajectory")
+    ax10.plot3D(posq[:,0], posq[:,1], posq[:,2], 'k-.',lw=1, label="Actual Trajectory")
     ax10.plot3D(posdes[:,0], posdes[:,1] , posdes[:,2],'darkgreen',ls='--',lw=1,label="Reference Trajectory")
     ax10.legend()
-    ax10 = setlimits(ax10, pos)
+    ax10 = setlimits(ax10, posq)
    ################################### 
     if powerDist:
         ax11[0].plot(time,thrust, c='k',lw=0.5), 
@@ -315,7 +384,7 @@ def main(args):
         ax11[4].plot(time, motorForces[:,2],c='g',lw=0.5, label='m3')
         ax11[4].plot(time, motorForces[:,3],c='k',lw=0.5, label='m4')
         ax11[4].plot(time, maxTh, c='r', lw=0.9, label='MAX_T')
-        print(maxTh[-1])
+        # print(maxTh[-1])
         ax11[4].set_ylabel('F [g]')        
 
         fig8.supxlabel(ts,fontsize='small')
@@ -326,11 +395,18 @@ def main(args):
         create_subtitle(fig8, grid[2, ::], 'roll')
         create_subtitle(fig8, grid[3, ::], 'Yaw')
         create_subtitle(fig8, grid[4, ::], 'Motor Forces')
-        
-
+    
+    elif not powerDist and controller == 'leep':
+        ax11[0].plot(time, ui[:,0], c='k',lw=0.5,label='desired Inp x')
+        ax11[1].plot(time, ui[:,1], c='k',lw=0.5,label='desired Inp y')
+        ax11[2].plot(time, ui[:,2], c='k',lw=0.5,label='desired Inp z')
+        ax11[0].set_ylabel('ux ',labelpad=-2), ax11[1].set_ylabel('uy ',labelpad=-2), ax11[2].set_ylabel('uz ',labelpad=-2)
+        fig8.supxlabel(ts,fontsize='small')
+        grid = plt.GridSpec(3,1)
+        create_subtitle(fig8, grid[0, ::], 'Desired Forces on Payload')
 
    ###################################
-    if controller in 'lee':
+    if controller == 'lee':
         txt = 'Kp = [{:.2f},{:.2f},{:.2f}]\n \
         Kd = [{:.2f},{:.2f},{:.2f}]\n \
         KR = [{:.4f},{:.4f},{:.4f}]\n \
@@ -340,13 +416,24 @@ def main(args):
         textax.axis(False)
         textax.text(0, 1, txt, size=13, color='black')
         textfig.savefig(f, format='pdf', bbox_inches='tight')
+    elif controller =='leep':
+        txt = 'Kp = [{:.2f},{:.2f},{:.2f}]\n \
+        Kd = [{:.2f},{:.2f},{:.2f}]\n \
+        Kq = [{:.4f},{:.4f},{:.4f}]\n \
+        Kw = [{:.4f},{:.4f},{:.4f}]'.format(Kpxy, Kpxy, Kpz, Kdxy, Kdxy, Kdz, Kqxy, Kqxy, Kqz, Kwxy, Kwxy, Kwz)
+        textfig, textax = plt.subplots(figsize=(3, 3))
+        textax.grid(False)
+        textax.axis(False)
+        textax.text(0, 1, txt, size=13, color='black')
+        textfig.savefig(f, format='pdf', bbox_inches='tight')
+
     fig1.savefig(f, format='pdf', bbox_inches='tight')
     fig2.savefig(f, format='pdf', bbox_inches='tight')
     fig3.savefig(f, format='pdf', bbox_inches='tight')        
     fig4.savefig(f, format='pdf', bbox_inches='tight')  
     fig5.savefig(f, format='pdf', bbox_inches='tight')  
     fig6.savefig(f, format='pdf', bbox_inches='tight')  
-    if powerDist:
+    if powerDist or controller == 'leep':
         fig8.savefig(f, format='pdf', bbox_inches='tight')      
     fig7.savefig(f, format='pdf', bbox_inches='tight')
     f.close()
@@ -356,6 +443,6 @@ if __name__ == "__main__":
     parser.add_argument("file_usd")
     parser.add_argument("controller")
     parser.add_argument("filename")
-    
+    parser.add_argument("--maxtime",type=float, default=10000)
     args = parser.parse_args()
     main(args)

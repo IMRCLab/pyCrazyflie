@@ -1,5 +1,6 @@
 import numpy as np
 from rowan.calculus import integrate as quat_integrate
+from rowan.functions import _promote_vec, _validate_unit, exp, multiply
 from rowan import from_matrix, to_matrix, to_euler, from_euler
 from scipy import  integrate, linalg
 from numpy.polynomial import Polynomial as poly
@@ -383,8 +384,11 @@ class UavModel:
     def getNextAngularState(self, curr_w, curr_q, tau):
         wdot  = self.invI @ (tau - skew(curr_w) @ self.I @ curr_w)
         wNext = wdot * self.dt + curr_w
-        qNext = quat_integrate(curr_q, curr_w, self.dt)
+        qNext = self.integrate_quat(curr_q, curr_w, self.dt)
         return qNext, wNext
+        
+    def integrate_quat(self, q, wb, dt):
+        return multiply(q, exp(_promote_vec(wb * dt / 2))) 
 
     def getNextLinearState(self, curr_vel, curr_position, q ,fz, fa):
         R_IB = to_matrix(q)

@@ -78,14 +78,14 @@ RobotswithPayload:
     refTrajPath: "trajectoriescsv/cirTraj1.csv" #hover_01.csv
     payloadCtrl: 'lee_firmware' #'lee'
     ctrlLee:
-      kp: 20 #10  
-      kd: 18
+      kp: 4 #10  
+      kd: 2
       ki: 0
       kr: 0.005 #8.81
       kw: 0.0009 #2.54
     cable_gains:
-      kq: 40
-      kw: 30
+      kq: 10
+      kw: 8
       ki: 0
   Robots:
     cf4: 
@@ -103,7 +103,7 @@ RobotswithPayload:
         kd: 2
         kr: 0.0055 #8.81
         kw: 0.0013 #2.54
-      l_c  : 1.0  # Length of cable
+      l_c  : 0.4 # Length of cable
       q_dg : [0, 0, 0] #[0,-51.4298,0]   #[-39.8273,36.159552, 20.156] #[-45, 0, 0] #[-45, 0, 0] # [0, 0, 0]  # Initial angle between UAV and payload
       qd   : [0, 0, 0]  # Initial angle derivates between UAV and payload (i.e., of cables)
       pos_fr_payload: [0, 0, 0] #position vector of the cable on the load (i.e., zero vector means a point mass)
