@@ -4,6 +4,7 @@ __pycache__
 *.pdf
 *.gif
 *.csv
+logScripts/*.pdf
 logScripts/logs/
 logScripts/data/
 logScripts/examples/

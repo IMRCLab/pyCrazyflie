@@ -44,27 +44,38 @@ def setlimits(ax, full_state):
 def plotPayloadStates(payload, posq, tf_sim, shared):
     """This function plots the states of the payload"""
     full_state = payload.plFullState
+    
+    if shared and payload.lead:
+        ref_state  = payload.plref_state
     # PL_states = [xl, vl, p, wl]
-    fig8, ax11 = plt.subplots(3, 1, sharex=True ,sharey=True)
+    fig8, ax11 = plt.subplots(3, 1)
     fig8.tight_layout()
     
-    fig9, ax12 = plt.subplots(3, 1, sharex=True, sharey=True)
+    fig9, ax12 = plt.subplots(3, 1)
     fig9.tight_layout()
 
-    fig10, ax13 = plt.subplots(3, 1, sharex=True ,sharey=True)
+    fig10, ax13 = plt.subplots(3, 1)
     fig10.tight_layout()
 
-    fig11, ax14 = plt.subplots(3, 1, sharex=True ,sharey=True)
+    fig11, ax14 = plt.subplots(3, 1)
     fig11.tight_layout()
     
-    fig12, ax15 = plt.subplots(1, 1, sharex=True ,sharey=True)
+    fig12, ax15 = plt.subplots(1, 1)
     fig12.tight_layout()
     
-
     time   = np.linspace(0, tf_sim*1e-3, num=len(full_state)) 
     pos    = full_state[:,0:3]
     linVel = full_state[:,3:6]
-   
+
+    if shared and payload.lead:
+        fig13, ax16 = plt.subplots(2, 3, sharex=True)
+        fig13.tight_layout()
+    
+        posdes    = ref_state[:,0:3]
+        linVeldes = ref_state[:,3:6]
+
+        poserr  = (posdes[:,:] - pos[:,:]).reshape(len(full_state),3)
+        linVerr = (linVeldes[:,:] - linVel[:,:]).reshape(len(full_state),3)
     if not shared:
         p      = full_state[:,6:9]
         angVel = full_state[:,9:12]
@@ -76,22 +87,32 @@ def plotPayloadStates(payload, posq, tf_sim, shared):
 ###############################################################################################
    
     ax11[0].plot(time, pos[:,0], c='k', lw=0.75, label='Actual'), ax11[1].plot(time, pos[:,1], lw=0.75, c='k'), ax11[2].plot(time, pos[:,2], lw=0.75, c='k')
+    if shared and payload.lead:
+        ax11[0].plot(time, posdes[:,0], lw=0.75, c='darkgreen',label='Reference'), ax11[1].plot(time, posdes[:,1], lw=0.75, c='darkgreen'), ax11[2].plot(time, posdes[:,2], lw=0.75, c='darkgreen')    
     ax11[0].set_ylabel('x [m]',), ax11[1].set_ylabel('y [m]'), ax11[2].set_ylabel('z [m]')
     ax11[0].legend()
     fig8.supxlabel(ts,fontsize='small')
 
     grid = plt.GridSpec(3,1)
-    create_subtitle(fig8, grid[0, ::], 'Actual Payload Positions')
+    if shared and payload.lead:
+        create_subtitle(fig8, grid[0, ::], 'Actual vs References Payload Linear Velocities')
+    else:
+        create_subtitle(fig8, grid[0, ::], 'Actual Payload Linear Velocities')
 ###############################################################################################
 
    
     ax12[0].plot(time, linVel[:,0],lw=0.75, c='k', label='Actual'), ax12[1].plot(time, linVel[:,1],lw=0.75, c='k'), ax12[2].plot(time, linVel[:,2],lw=0.75, c='k')
+    if shared and payload.lead:
+        ax12[0].plot(time, linVeldes[:,0],lw=0.75, c='darkgreen',label='Reference'), ax12[1].plot(time, linVeldes[:,1],lw=0.75, c='darkgreen'), ax12[2].plot(time, linVeldes[:,2],lw=0.75, c='darkgreen')
     ax12[0].set_ylabel('vx [m/s]'), ax12[1].set_ylabel('vy [m/s]'), ax12[2].set_ylabel('vz [m/s]')
     ax12[0].legend()
     fig9.supxlabel(ts,fontsize='small')
 
     grid = plt.GridSpec(3,1)
-    create_subtitle(fig9, grid[0, ::], 'Actual Payload Linear Velocities')
+    if shared and payload.lead:
+        create_subtitle(fig9, grid[0, ::], 'Actual vs References Payload Linear Velocities')
+    else:
+        create_subtitle(fig9, grid[0, ::], 'Actual Payload Linear Velocities')
 
 ###############################################################################################
     if shared:
@@ -126,16 +147,30 @@ def plotPayloadStates(payload, posq, tf_sim, shared):
 
     for i in range(0, len(norm_x)):
         norm_x[i] = np.linalg.norm(pos[i,:] - posq[i,:])
-
     ax15.plot(time, norm_x,c='k',lw=1, label='Norm')
     ax15.set_ylabel('||xq - xp||',labelpad=-2)    
+    ax15.set_ylim([round(min(norm_x), 7),round(max(norm_x)+0.000001, 7)])
     fig12.supxlabel(ts,fontsize='small')
 
     grid = plt.GridSpec(3,1)
     create_subtitle(fig12, grid[0, ::], 'Diff between Quadrotor and Payload Positions (Norm)')
 
-    return fig8, fig9, fig10, fig11, fig12
-
+###################################################################################################
+    if shared and payload.lead:
+        ax16[0,0].plot(time, poserr[:,0],c='r',lw=0.7), ax16[0,1].plot(time, poserr[:,1],c='r',lw=0.7), ax16[0,2].plot(time, poserr[:,2],c='r',lw=0.7)
+        ax16[0,0].set_ylabel('ex [m/s]'), ax16[0,1].set_ylabel('ey [m/s]'), ax16[0,2].set_ylabel('ez [m/s]')
+        
+        ax16[1,0].plot(time, linVerr[:,0],c='r',lw=0.7), ax16[1,1].plot(time, linVerr[:,1],c='r',lw=0.7), ax16[1,2].plot(time, linVerr[:,2],c='r',lw=0.7)
+        ax16[1,0].set_ylabel('vex [m/s]'), ax16[1,1].set_ylabel('vey [m/s]'), ax16[1,2].set_ylabel('vez [m/s]')
+        fig13.supxlabel(ts,fontsize='small')
+        
+        grid = plt.GridSpec(2,3)
+        create_subtitle(fig13, grid[0, ::], 'Positional errors')
+        create_subtitle(fig13, grid[1, ::], 'Linear Velocities errors')
+    if shared and payload.lead:
+        return fig8, fig9, fig10, fig11, fig12, fig13
+    else:
+        return fig8, fig9, fig10, fig11, fig12
 
 
 ###############################################################################################
@@ -162,13 +197,13 @@ def outputPlots(uavs, payloads, tf_sim, pdfName, shared):
         plt.rcParams['axes.grid'] = True
         plt.rcParams['figure.max_open_warning'] = 100
         
-        fig1, ax1 = plt.subplots(3, 1, sharex=True ,sharey=True)
+        fig1, ax1 = plt.subplots(3, 1, sharex=True)
         fig1.tight_layout()
         
-        fig2, ax2 = plt.subplots(3, 1, sharex=True, sharey=True)
+        fig2, ax2 = plt.subplots(3, 1, sharex=True)
         fig2.tight_layout()
 
-        fig3, ax3 = plt.subplots(3, 1, sharex=True ,sharey=True)
+        fig3, ax3 = plt.subplots(3, 1, sharex=True)
         fig3.tight_layout()
 
         fig4, ax4 = plt.subplots(2, 3, sharex=True ,sharey=True)
@@ -182,8 +217,8 @@ def outputPlots(uavs, payloads, tf_sim, pdfName, shared):
 
         ax5 = fig5.add_subplot(gs[:, 0])
         ax6 = fig5.add_subplot(gs[0,1])
-        ax7 = fig5.add_subplot(gs[1,1],sharey=ax6)
-        ax8 = fig5.add_subplot(gs[2,1],sharey=ax6)
+        ax7 = fig5.add_subplot(gs[1,1])
+        ax8 = fig5.add_subplot(gs[2,1])
 
         fig6, ax9 = plt.subplots(4, 1, sharex=True ,sharey=True,figsize=(9,4.8))
         fig6.tight_layout()
@@ -274,7 +309,6 @@ def outputPlots(uavs, payloads, tf_sim, pdfName, shared):
         
         ax6.plot(time, cont_stack[:,1], lw=0.8, c='darkblue'), ax7.plot(time, cont_stack[:,2], lw=0.8, c='darkblue'), ax8.plot(time, cont_stack[:,3],lw=0.8, c='darkblue')
         ax6.set_ylabel('taux [N.m]',fontsize='small'), ax7.set_ylabel('tauy [N.m]',fontsize='small'), ax8.set_ylabel('tauz [N.m]',fontsize='small')
-        ax7.set_ylim([-0.1, 0.1])
         fig5.supxlabel(ts,fontsize='small')
 
         create_subtitle(fig5, gs[::, 0], 'Force Control Input')
@@ -296,28 +330,42 @@ def outputPlots(uavs, payloads, tf_sim, pdfName, shared):
         ax10 = fig7.add_subplot(autoscale_on=True,projection="3d")
         ax10.plot3D(pos[:,0], pos[:,1], pos[:,2], 'k-.',lw=1.5, label="Actual Trajectory")
         ax10.plot3D(posdes[:,0], posdes[:,1] , posdes[:,2],'darkgreen',ls='--',lw=1.5,label="Reference Trajectory")
+        if shared:
+            plfull_state = payload.plFullState
+            pospl    = full_state[:,0:3]
+            ax10.plot3D(pospl[:,0], pospl[:,1], pospl[:,2], 'k-.',lw=1.5)
+            if payload.lead:
+                plref_state  = payload.plref_state
+                posdespl    = plref_state[:,0:3]
+                ax10.plot3D(posdespl[:,0], posdespl[:,1] , posdespl[:,2],'darkgreen',ls='--',lw=1.5)
         ax10.legend()
         ax10 = setlimits(ax10, pos)
 
         if uav_.pload:
-            fig8, fig9, fig10, fig11, fig12 = plotPayloadStates(payload, pos, tf_sim, shared)
-    
+            if shared and payload.lead:
+                fig8, fig9, fig10, fig11, fig12, fig14 = plotPayloadStates(payload, pos, tf_sim, shared)
+            else:   
+                 fig8, fig9, fig10, fig11, fig12 = plotPayloadStates(payload, pos, tf_sim, shared)
         textfig.savefig(f, format='pdf', bbox_inches='tight')
         fig1.savefig(f, format='pdf', bbox_inches='tight')
         fig2.savefig(f, format='pdf', bbox_inches='tight')
         fig3.savefig(f, format='pdf', bbox_inches='tight')
         if uav_.controller['name'] in 'lee':
             fig13.savefig(f, format='pdf', bbox_inches='tight')
-        fig4.savefig(f, format='pdf', bbox_inches='tight')  
+        if shared and not payload.lead:
+            fig4.savefig(f, format='pdf', bbox_inches='tight') 
         fig5.savefig(f, format='pdf', bbox_inches='tight')  
         fig6.savefig(f, format='pdf', bbox_inches='tight')
         fig7.savefig(f, format='pdf', bbox_inches='tight')
         if uav_.pload:
             fig8.savefig(f, format='pdf', bbox_inches='tight')
             fig9.savefig(f, format='pdf', bbox_inches='tight')
+            if shared and payload.lead:
+                fig14.savefig(f,  format='pdf', bbox_inches='tight')
             fig10.savefig(f, format='pdf', bbox_inches='tight')
             fig11.savefig(f, format='pdf', bbox_inches='tight')
             fig12.savefig(f, format='pdf', bbox_inches='tight')
+    
     f.close()
 
 
@@ -369,8 +417,8 @@ class PlotandAnimate:
         self.vec1d = self.ax.quiver([],[],[],[],[],[])
         self.vec2d = self.ax.quiver([],[],[],[],[],[])
         self.vec3d = self.ax.quiver([],[],[],[],[],[])
-        self.armb1  = np.array([[self.uavModel.d*10**(1.7)*np.cos(0)], [self.uavModel.d*10**(1.7)*np.sin(0)] ,[0]])
-        self._armb1 = np.array([[-self.uavModel.d*10**(1.7)*np.cos(0)], [-self.uavModel.d*10**(1.7)*np.sin(0)] ,[0]])
+        self.armb1  = np.array([[self.uavModel.d*10**(0.64)*np.cos(0)], [self.uavModel.d*10**(0.64)*np.sin(0)] ,[0]])
+        self._armb1 = np.array([[-self.uavModel.d*10**(0.64)*np.cos(0)], [-self.uavModel.d*10**(0.64)*np.sin(0)] ,[0]])
         q90z        = rn.from_euler(0, 0, np.radians(90),convention='xyz')
         rot90z      = rn.to_matrix(q90z)
         self.armb2  = rot90z @ (self.armb1.reshape(3,))
@@ -384,8 +432,8 @@ class PlotandAnimate:
     def setlimits(self):
         # This method finds the maximum value in the x-y-z actual states for the UAV(s) and sets the limits of the figure accordingly   
         # edge: adds extra space for the figure 
-        edge_ = -0.5
-        edge  = 0.5
+        edge_ = -0.1
+        edge  = 0.1
         maxs_  = []
         for uav in self.uavModels.values():
             max_x = max(uav.fullState[:,0])
@@ -400,9 +448,11 @@ class PlotandAnimate:
             maxs_.append(max_)
 
         max_ = max(maxs_)
-        self.ax.set_xlim3d([-max_+edge_, max_+edge+1])
+        if max_ > 2:
+            max_ = 2
+        self.ax.set_xlim3d([-max_+edge_, max_+edge])
         self.ax.set_ylim3d([-max_+edge_, max_+edge])
-        self.ax.set_zlim3d([-max_+edge_, max_+edge])
+        self.ax.set_zlim3d([-0.8-max_+edge_, max_+edge])
         self.ax.set_xlabel('X')
         self.ax.set_ylabel('Y')
         self.ax.set_zlabel('Z')
@@ -486,9 +536,12 @@ class PlotandAnimate:
             self.uavModel        = self.uavModels[id]
             self.full_state      = self.uavModel.fullState[::self.sample, :]
             self.reference_state =  self.uavModel.refState[::self.sample, :]
+        
             if self.uavModel.pload:
                 if self.shared:
                     self.payload = self.payloads 
+                if self.payload.lead:
+                    self.reference_state = self.payload.plref_state[::self.sample, :]
                 else:
                     self.payload     = self.payloads[id]
                 self.plFullstate = self.payload.plFullState[::self.sample, :]            
@@ -500,7 +553,7 @@ class PlotandAnimate:
             if self.uavModel.pload:
                 xl, yl, zl  = self.getPayloadStates(i)
                 self.drawPayload(x[i], y[i], z[i], xl[i], yl[i], zl[i])
-                # self.drawPlTraj(xl, yl, zl)
+                self.drawPlTraj(xl, yl, zl)
                 r = 0.08
                 xsp, ysp, zsp = Sphere(xl, yl, zl, r)
                 self.ax.plot_surface(xl[i]+xsp, yl[i]+ysp, zl[i]+zsp, cmap=plt.cm.YlGnBu_r)
