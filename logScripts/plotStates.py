@@ -184,7 +184,7 @@ def main(args):
     posdes = np.column_stack((
     logData['ctrltargetZ.x'] / 1000.0,
     logData['ctrltargetZ.y'] / 1000.0,
-    logData['ctrltargetZ.z'] / 1000.0 - 0.45))
+    logData['ctrltargetZ.z'] / 1000.0))
 
     linVeldes = np.column_stack((
     logData['ctrltargetZ.vx'] / 1000.0,
@@ -281,8 +281,8 @@ def main(args):
 
 
     ax1[0].plot(time, posq[:,0], c='k', lw=0.75,label='Actual of UAV'), ax1[1].plot(time, posq[:,1], lw=0.75, c='k'), ax1[2].plot(time, posq[:,2], lw=0.75, c='k')
-    if controller == 'leep':
-        ax1[0].plot(time, posp[:,0], c='b', lw=0.75,label='Actual'), ax1[1].plot(time, posp[:,1], lw=0.75, c='b'), ax1[2].plot(time, posp[:,2], lw=0.75, c='b')
+    # if controller == 'leep':
+        # ax1[0].plot(time, posp[:,0], c='b', lw=0.75,label='Actual'), ax1[1].plot(time, posp[:,1], lw=0.75, c='b'), ax1[2].plot(time, posp[:,2], lw=0.75, c='b')
     ax1[0].plot(time, posdes[:,0], lw=0.75, c='darkgreen',label='Reference'), ax1[1].plot(time, posdes[:,1], lw=0.75, c='darkgreen'), ax1[2].plot(time, posdes[:,2], lw=0.75, c='darkgreen')
     ax1[0].set_ylabel('x [m]',), ax1[1].set_ylabel('y [m]'), ax1[2].set_ylabel('z [m]')
     ax1[0].legend()

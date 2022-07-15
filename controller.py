@@ -33,6 +33,7 @@ def setTrajmode(setpoint):
     setpoint.mode.x = cffirmware.modeAbs
     setpoint.mode.y = cffirmware.modeAbs
     setpoint.mode.z = cffirmware.modeAbs
+    setpoint.mode.quat = cffirmware.modeAbs
     setpoint.mode.roll = cffirmware.modeDisable
     setpoint.mode.pitch = cffirmware.modeDisable
     setpoint.mode.yaw = cffirmware.modeDisable
@@ -50,22 +51,24 @@ def updateDesState(setpoint, controller, fulltraj):
     setpoint.acceleration.y = fulltraj[7]  # m/s^2
     setpoint.acceleration.z = fulltraj[8]  # m/s^2
     setpoint.attitude.yaw = 0  # deg
-    if len(fulltraj) == 15 and (controller['name'] in 'lee' \
-    or controller['name'] in 'lee_firmware'):
+    if len(fulltraj) == 15 and (controller['name'] == 'lee' \
+    or controller['name'] == 'lee_firmware'):
         setpoint.jerk.x = fulltraj[9]
         setpoint.jerk.y = fulltraj[10]
         setpoint.jerk.z = fulltraj[11]
-        setpoint.snap.x = fulltraj[12]
-        setpoint.snap.y = fulltraj[13]
-        setpoint.snap.z = fulltraj[14]
-    elif len(fulltraj) == 9 and (controller['name'] in 'lee' \
-    or controller['name'] in 'lee_firmware'):
+        if controller['name'] == 'lee':
+            setpoint.snap.x = fulltraj[12]
+            setpoint.snap.y = fulltraj[13]
+            setpoint.snap.z = fulltraj[14]
+    elif len(fulltraj) == 9 and (controller['name'] == 'lee' \
+    or controller['name'] == 'lee_firmware'):
         setpoint.jerk.x = 0 
         setpoint.jerk.y = 0 
         setpoint.jerk.z = 0 
-        setpoint.snap.x = 0 
-        setpoint.snap.y = 0 
-        setpoint.snap.z = 0 
+        if controller['name'] == 'lee':
+            setpoint.snap.x = 0 
+            setpoint.snap.y = 0 
+            setpoint.snap.z = 0 
     return setpoint
     
 def updateSensor(sensors, uav):
@@ -423,12 +426,11 @@ def main(args, animateOrPlotdict, params):
                 states[id]    = state 
 
         for tick in range(0, int(tf_sim)+1):
-            # print(tick*1e-3)
             j = plStSize
-            torques = np.zeros((1,3))
+            ctrlInputs = np.zeros((1,4))
             if payload.lead:
                 ## Update setpoint of payload desired states
-                if tick <= int(tf_ms):    
+                if tick <= int(tf_ms):   
                     setpoint  = updatePlDesState(setpoint, payload, timeStamped_traj[1::,tick])
                     plref_state   = np.array([setpoint.position.x, setpoint.position.y, setpoint.position.z, setpoint.velocity.x, setpoint.velocity.y, setpoint.velocity.z])
                 else: 
@@ -482,11 +484,11 @@ def main(args, animateOrPlotdict, params):
                         cffirmware.controllerLee(control, setpoint, sensors, state, tick)                           
                     else:    
                         cffirmware.controllerSJC(control, setpoint, sensors, state, tick)            
-            
                 control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
-                torques  = np.vstack((torques, control_inp[1::].reshape(1,3)))
+
+                ctrlInputs  = np.vstack((ctrlInputs, control_inp.reshape(1,4)))
                 Re3 = rn.to_matrix(uavs[id].state[6:10])@np.array([0,0,1])
-                ctrlInp  =  np.array([control.u_all[0], control.u_all[1], control.u_all[2]])
+                ctrlInp  = np.array([control.u_all[0], control.u_all[1], control.u_all[2]])
                 payload.stackCtrl(ctrlInp.reshape(1,3))  
                 if not payload.lead:
                     controls[id]  = control
@@ -496,7 +498,7 @@ def main(args, animateOrPlotdict, params):
                 j+=3
             payload.cursorUp() 
             # Evolve the payload states
-            uavs, loadState =  payload.stateEvolution(torques, uavs, uavs_params)
+            uavs, loadState =  payload.stateEvolution(ctrlInputs, uavs, uavs_params)
             if payload.lead:
                 payload.stackStateandRef(plref_state)
             else:
@@ -547,8 +549,7 @@ def main(args, animateOrPlotdict, params):
                     cffirmware.controllerSJC(control, setpoint, sensors, state, tick)               
                 control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
                 if uavs[id].pload:
-                    payloads[id].PL_nextState(control_inp, uavs[id])
-                    uavs[id].state = StQuadfromPL(payloads[id])
+                    uavs[id] = payloads[id].PL_nextState(control_inp, uavs[id])
                 else:
                     uavs[id].states_evolution(control_inp)  # states evolution
                 uavs[id].stackStandCtrl(uavs[id].state, control_inp, ref_state)    
