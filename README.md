@@ -41,6 +41,4 @@ Add _cffirmware-firmware/_ to your `PYTHONPATH`. Open a terminal in the `pyCrazy
 ## TODOS:
 * [ ] Add tests (with pytest) for different configuration of the config.yaml and examples folders.
 * [ ] Use vispy.
-* [ ] Add clipping for the rotors (to match the actual firmware).
-* [ ] Add lee controller for multi UAVs case in python.
 
