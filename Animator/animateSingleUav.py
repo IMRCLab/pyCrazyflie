@@ -543,7 +543,10 @@ class PlotandAnimate:
                 if self.payload.lead:
                     self.reference_state = self.payload.plref_state[::self.sample, :]
                 else:
-                    self.payload     = self.payloads[id]
+                    if self.shared: 
+                        self.payload     = self.payloads
+                    else:
+                        self.payload     = self.payloads[id]
                 self.plFullstate = self.payload.plFullState[::self.sample, :]            
             self.initializeQuad(self.uavModel)
             x, y, z, q                   = self.getCurrState(i)
