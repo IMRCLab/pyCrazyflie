@@ -178,13 +178,13 @@ def main(args):
             qidot = (qi_curr - qi_prev)/dt 
             qidotfilt =  (1-alpha)*qi_dot_prev + alpha * qidot
             qi_dot_prev = qidotfilt
-            linvp = linVel[i,:] + 0.453*qidotfilt
+            linvp = linVel[i,:] + 0.663*qidotfilt
             linVelp_est[i+1,:] = linvp
  
     posdes = np.column_stack((
     logData['ctrltargetZ.x'] / 1000.0,
     logData['ctrltargetZ.y'] / 1000.0,
-    logData['ctrltargetZ.z'] / 1000.0))
+    logData['ctrltargetZ.z'] / 1000.0 - 0.57))
 
     linVeldes = np.column_stack((
     logData['ctrltargetZ.vx'] / 1000.0,
@@ -281,8 +281,8 @@ def main(args):
 
 
     ax1[0].plot(time, posq[:,0], c='k', lw=0.75,label='Actual of UAV'), ax1[1].plot(time, posq[:,1], lw=0.75, c='k'), ax1[2].plot(time, posq[:,2], lw=0.75, c='k')
-    # if controller == 'leep':
-        # ax1[0].plot(time, posp[:,0], c='b', lw=0.75,label='Actual'), ax1[1].plot(time, posp[:,1], lw=0.75, c='b'), ax1[2].plot(time, posp[:,2], lw=0.75, c='b')
+    if controller == 'leep':
+        ax1[0].plot(time, posp[:,0], c='b', lw=0.75,label='Actual of load'), ax1[1].plot(time, posp[:,1], lw=0.75, c='b'), ax1[2].plot(time, posp[:,2], lw=0.75, c='b')
     ax1[0].plot(time, posdes[:,0], lw=0.75, c='darkgreen',label='Reference'), ax1[1].plot(time, posdes[:,1], lw=0.75, c='darkgreen'), ax1[2].plot(time, posdes[:,2], lw=0.75, c='darkgreen')
     ax1[0].set_ylabel('x [m]',), ax1[1].set_ylabel('y [m]'), ax1[2].set_ylabel('z [m]')
     ax1[0].legend()
@@ -364,7 +364,9 @@ def main(args):
     create_subtitle(fig6, gs[::, 1], 'Torque Control Input')
 
     ###################################
-    ax10.plot3D(posq[:,0], posq[:,1], posq[:,2], 'k-.',lw=1, label="Actual Trajectory")
+    if controller == 'leep':
+        ax10.plot3D(posp[:,0], posp[:,1], posp[:,2], 'r-.',lw=1, label="Actual Trajectory Load")
+    ax10.plot3D(posq[:,0], posq[:,1], posq[:,2], 'k-.',lw=1, label="Actual Trajectory UAV")
     ax10.plot3D(posdes[:,0], posdes[:,1] , posdes[:,2],'darkgreen',ls='--',lw=1,label="Reference Trajectory")
     ax10.legend()
     ax10 = setlimits(ax10, posq)
