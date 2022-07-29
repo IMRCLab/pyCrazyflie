@@ -85,13 +85,14 @@ class SharedPayload:
         self.mt_  = 0
         self.numOfquads = 0
         self.J_bar_term = np.zeros((3,3))
-        if payload_params['payloadLead'] in 'enabled':
+        if payload_params['payloadCtrl']['payloadLead'] == 'enabled':
             self.lead = True
         else: 
             self.lead = False
-        self.controller = payload_params['ctrlLee']
-        self.cablegains = payload_params['cable_gains']
-        self.ctrlType   = payload_params['payloadCtrl']
+        self.controller = payload_params['payloadCtrl']['gains']['ctrlLee']
+        self.cablegains = payload_params['payloadCtrl']['gains']['cable']
+        self.ctrlType   = payload_params['payloadCtrl']['name']
+        self.offset     = float(payload_params['payloadCtrl']['offset'])
         self.posFrload = np.empty((1,3))
         for name, uav in uavs_params.items():
             self.posFrload = np.vstack((self.posFrload, np.array(uav['pos_fr_payload']).reshape((1,3))))
@@ -348,10 +349,7 @@ class UavModel:
         self.controller = uav_params['controller']
         self.fullState = np.empty((1,16))
         self.ctrlInps  = np.empty((1,8))
-        if self.controller['name'] in 'lee':
-            self.refState  = np.empty((1,12))
-        else:
-            self.refState  = np.empty((1,6))
+        self.refState  = np.empty((1,12))
         self.drag  = float((uav_params['drag']))
         if self.drag ==  1:
             self.Kaero = np.diag([-9.1785e-7, -9.1785e-7, -10.311e-7]) 

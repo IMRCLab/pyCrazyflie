@@ -14,9 +14,39 @@ np.set_printoptions(suppress=True)
 
 def initController(controller):
     """This function initializes the controller"""
-    if controller['name'] == 'lee_firmware' or controller['name'] == 'lee':
+    if controller['name'] == 'lee':
         cffirmware.controllerLeeInit()
-    else:
+    elif controller['name'] == 'lee_firmware':
+        lee = cffirmware.controllerLee_t()
+        cffirmware.controllerLeeInit(lee)
+        lee.Kpos_P.x = controller['kpx']
+        lee.Kpos_P.y = controller['kpy']
+        lee.Kpos_P.z = controller['kpz']
+        lee.Kpos_D.x = controller['kdx']
+        lee.Kpos_D.y = controller['kdy']
+        lee.Kpos_D.z = controller['kdz']
+        lee.Kpos_I.x = controller['kipx']
+        lee.Kpos_I.y = controller['kipy']
+        lee.Kpos_I.z = controller['kipz']
+        lee.KR.x     = controller['krx']
+        lee.KR.y     = controller['kry']
+        lee.KR.z     = controller['krz']
+        lee.Komega.x = controller['kwx']
+        lee.Komega.y = controller['kwy']
+        lee.Komega.z = controller['kwz']
+        lee.KI.x     = controller['kix']
+        lee.KI.y     = controller['kiy']
+        lee.KI.z     = controller['kiz']   
+    
+        control = cffirmware.control_t()
+        # allocate desired state
+        setpoint = cffirmware.setpoint_t()
+        setpoint = setTrajmode(setpoint)
+        sensors = cffirmware.sensorData_t()
+        state = cffirmware.state_t()
+        
+        return lee, control, setpoint, sensors, state
+    elif controller['name'] == 'sjc_firmware':
         cffirmware.controllerSJCInit()
     # Allocate output variable
     # For this example, only thrustSI, and torque members are relevant
@@ -26,6 +56,7 @@ def initController(controller):
     setpoint = setTrajmode(setpoint)
     sensors = cffirmware.sensorData_t()
     state = cffirmware.state_t()
+    
     return control, setpoint, sensors, state 
 
 def setTrajmode(setpoint):
@@ -212,7 +243,7 @@ def setParams(params):
     
     for name, robot in params['Robots'].items():
         trajectories['uav_'+name]   = robot['refTrajPath']
-        if robot['payload']['mode'] in 'enabled':
+        if robot['payload']['mode'] == 'enabled':
             payload_params          = {**robot['payload'], **robot['initConditions'], 'm':robot['m'], 'dt':dt}
             dt, initState           = initializeStateWithPayload(payload_params)
             payload                 = uav.Payload(dt, initState, payload_params)
@@ -274,7 +305,7 @@ def setTeamParams(params, initUavs):
     ## of the UAVs (which is not what is normally done, but for the sake of having easier tests).
     if not initUavs:
         for key in (params['RobotswithPayload']['payload']).keys():
-            if key in 'refTrajPath':
+            if key == 'refTrajPath':
                 pltrajectory = params['RobotswithPayload']['payload']['refTrajPath']
         payload_params = {**params['RobotswithPayload']['payload'], 'dt': dt}
         uavs_params = {}
@@ -306,7 +337,50 @@ def setTeamParams(params, initUavs):
     return plStSize, uavs, uavs_params, payload, trajectories, pltrajectory
 
 
-def initPLController():
+def initPLController(payload):
+    """This function initializes the controller"""
+    if payload.ctrlType == 'lee':
+        cffirmware.controllerLeePayloadFimrwareInit() 
+    elif payload.ctrlType == 'lee_firmware':
+        leePayload = cffirmware.controllerLeePayload_t()
+        cffirmware.controllerLeePayloadInit(leePayload)
+        leePayload.mp = payload.mp
+        leePayload.offset = payload.offset
+        leePayload.Kpos_P.x = payload.controller['kpx']
+        leePayload.Kpos_P.y = payload.controller['kpy']
+        leePayload.Kpos_P.z = payload.controller['kpz']
+        leePayload.Kpos_D.x = payload.controller['kdx']
+        leePayload.Kpos_D.y = payload.controller['kdy']
+        leePayload.Kpos_D.z = payload.controller['kdz']
+        leePayload.Kpos_I.x = payload.controller['kipx']
+        leePayload.Kpos_I.y = payload.controller['kipy']
+        leePayload.Kpos_I.z = payload.controller['kipz']
+       
+        leePayload.KR.x     = payload.controller['krx']
+        leePayload.KR.y     = payload.controller['kry']
+        leePayload.KR.z     = payload.controller['krz']
+        leePayload.Komega.x = payload.controller['kwx']
+        leePayload.Komega.y = payload.controller['kwy']
+        leePayload.Komega.z = payload.controller['kwz']
+        leePayload.KI.x     = payload.controller['kix']
+        leePayload.KI.y     = payload.controller['kiy']
+        leePayload.KI.z     = payload.controller['kiz']   
+
+        leePayload.K_q.x    = payload.cablegains['kqx']
+        leePayload.K_q.y    = payload.cablegains['kqy']
+        leePayload.K_q.z    = payload.cablegains['kqz']
+        leePayload.K_w.x    = payload.cablegains['kwcx']
+        leePayload.K_w.y    = payload.cablegains['kwcy']
+        leePayload.K_w.z    = payload.cablegains['kwcz']
+        control = cffirmware.control_t()
+        # allocate desired state
+        setpoint = cffirmware.setpoint_t()
+        setpoint = setTrajmode(setpoint)
+        sensors = cffirmware.sensorData_t()
+        state = cffirmware.state_t()
+        
+        return leePayload, control, setpoint, sensors, state
+
     cffirmware.controllerLeePayloadInit() 
     controls = cffirmware.control_t()
     # allocate desired state
@@ -390,7 +464,7 @@ def main(args, animateOrPlotdict, params):
        plStSize, uavs, uavs_params, payload, trajectories, pltrajectory = setTeamParams(params, initUavs)
        shared = True
     else:
-        uavs, payloads, trajectories = setParams(params)
+        uavs, payload, trajectories = setParams(params)
     # Upload the traj in csv file format
     # rows: time, xdes, ydes, zdes, vxdes, vydes, vzdes, axdes, aydes, azdes  
     timeStamped_traj = {}
@@ -415,11 +489,15 @@ def main(args, animateOrPlotdict, params):
 
     if shared:
         if payload.lead:
-            control, setpoint, sensors, state = initPLController()
+                leePayload, control, setpoint, sensors, state = initPLController(payload)
         else:
-            controls, setpoints, sensors_, states =  {}, {}, {}, {}
+            controls, setpoints, sensors_, states, lees =  {}, {}, {}, {}, {} 
             for id in uavs.keys():
-                control, setpoint, sensors, state = initController(uavs[id].controller)
+                if uavs[id].controller['name'] == 'lee_firmware':
+                    lee, control, setpoint, sensors, state = initController(uavs[id].controller)
+                    lees[id] = lee
+                else:
+                    control, setpoint, sensors, state = initController(uavs[id].controller)
                 controls[id]  = control
                 setpoints[id] = setpoint
                 sensors_[id]  = sensors
@@ -471,9 +549,10 @@ def main(args, animateOrPlotdict, params):
                         torquesTick, des_w, des_wd = cffirmware.torqueCtrlwPayload(uavs[id], control.thrustSI, payload,  setpoint, tick*1e-3)
                         control.torque = np.array([torquesTick[0], torquesTick[1], torquesTick[2]])
                         ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)
-
                     elif payload.ctrlType == 'lee_firmware':
-                        cffirmware.controllerLeePayload(control, setpoint, sensors, state, tick)
+                        leePayload.l = uavs[id].lc
+                        leePayload.mass = uavs[id].m
+                        cffirmware.controllerLeePayload(leePayload, control, setpoint, sensors, state, tick)
                         des_w, des_wd  = np.zeros(3,), np.zeros(3,)
                         ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)
                 else:
@@ -481,14 +560,21 @@ def main(args, animateOrPlotdict, params):
                         control, des_w, des_wd  = cffirmware.controllerLee(uavs[id], control, setpoint, sensors, state, tick)     
                         ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)     
                     elif uavs[id].controller['name'] == 'lee_firmware':
-                        cffirmware.controllerLee(control, setpoint, sensors, state, tick)                           
+                        lee = lees[id]
+                        cffirmware.controllerLee(lee, control, setpoint, sensors, state, tick)      
+                        des_w, des_wd  = np.zeros(3,), np.zeros(3,)
+                        ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)
                     else:    
-                        cffirmware.controllerSJC(control, setpoint, sensors, state, tick)            
+                        cffirmware.controllerSJC(control, setpoint, sensors, state, tick)    
+                        des_w, des_wd  = np.zeros(3,), np.zeros(3,)
+                        ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)        
                 control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
-
                 ctrlInputs  = np.vstack((ctrlInputs, control_inp.reshape(1,4)))
                 Re3 = rn.to_matrix(uavs[id].state[6:10])@np.array([0,0,1])
-                ctrlInp  = np.array([control.u_all[0], control.u_all[1], control.u_all[2]])
+                if payload.lead:
+                    ctrlInp  = np.array([control.u_all[0], control.u_all[1], control.u_all[2]])
+                else: 
+                    ctrlInp  = control_inp[0]*Re3 
                 payload.stackCtrl(ctrlInp.reshape(1,3))  
                 if not payload.lead:
                     controls[id]  = control
@@ -519,7 +605,10 @@ def main(args, animateOrPlotdict, params):
         for id in uavs.keys():
             #initialize the controller and allocate current state (both sensor and state are the state)
             # This is kind of odd and should be part of state
-            control, setpoint, sensors, state = initController(uavs[id].controller)
+            if uavs[id].controller['name'] == 'lee_firmware':
+                lee, control, setpoint, sensors, state = initController(uavs[id].controller)
+            else:
+                control, setpoint, sensors, state = initController(uavs[id].controller)
             # Note that 1 tick == 1ms
             # note that the attitude controller will only compute a new output at 500 Hz
             # and the position controller only at 100 Hz
@@ -544,9 +633,13 @@ def main(args, animateOrPlotdict, params):
                     control, des_w, des_wd  = cffirmware.controllerLee(uavs[id], control, setpoint, sensors, state, tick)     
                     ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)     
                 elif uavs[id].controller['name'] in 'lee_firmware':
-                    cffirmware.controllerLee(control, setpoint, sensors, state, tick)                           
+                    cffirmware.controllerLee(lee, control, setpoint, sensors, state, tick)   
+                    des_w, des_wd  = np.zeros(3,), np.zeros(3,)
+                    ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)                        
                 else:    
-                    cffirmware.controllerSJC(control, setpoint, sensors, state, tick)               
+                    cffirmware.controllerSJC(control, setpoint, sensors, state, tick)  
+                    des_w, des_wd  = np.zeros(3,), np.zeros(3,)
+                    ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)             
                 control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
                 if uavs[id].pload:
                     uavs[id] = payloads[id].PL_nextState(control_inp, uavs[id])
