@@ -214,7 +214,7 @@ def animateTrajectory(uavs, payloads, videoname, shared):
     # Animation    
     fig     = plt.figure(figsize=(10,10))
     ax      = fig.add_subplot(autoscale_on=True,projection="3d")
-    sample  = 100 
+    sample  = 100
     animate = animateSingleUav.PlotandAnimate(fig, ax, uavs, payloads, sample, shared) 
     dt_sampled = list(uavs.values())[0].dt * sample
     print("Starting Animation... \nAnimating, Please wait...")
@@ -247,17 +247,17 @@ def setParams(params):
             payload_params          = {**robot['payload'], **robot['initConditions'], 'm':robot['m'], 'dt':dt}
             dt, initState           = initializeStateWithPayload(payload_params)
             payload                 = uav.Payload(dt, initState, payload_params)
-            uav1                    = uav.UavModel(dt, StQuadfromPL(payload), robot, pload=True, lc=payload.lc)
+            uav1                    = uav.UavModel(dt, 'uav_'+name, StQuadfromPL(payload), robot, pload=True, lc=payload.lc)
             uavs['uav_'+name]       = uav1
             payloads['uav_'+name] = payload
         else:
             uav_params     = {'dt': dt, **robot['initConditions'], **robot}
             dt, initState  = initializeState(uav_params)
-            uav1           = uav.UavModel(dt, initState, uav_params) 
+            uav1           = uav.UavModel(dt, 'uav_'+name, initState, uav_params) 
             uavs['uav_'+name] = uav1
     return uavs, payloads, trajectories        
 
-def StatefromSharedPayload(payload, angState, lc, j):
+def StatefromSharedPayload(id, payload, angState, lc, j):
     ## Thid method computes the initial conditions of each quadrotor
     #  given the initial condition of the payload and the directional unit vectors of each cable
     qi = payload.state[j:j+3]
@@ -266,6 +266,13 @@ def StatefromSharedPayload(payload, angState, lc, j):
     posq =  payload.state[0:3] - lc * qi
     pdot = np.cross(wi, qi)
     velq = payload.state[3:6] - lc * pdot
+    if not payload.pointmass:
+        R0   = rn.to_matrix(payload.state[6:10])
+        posFrload = payload.posFrloaddict[id]
+        posq += R0@posFrload
+        wl = payload.state[10:13] #wl of payload
+        R0_dot = R0@uav.skew(wl)
+        velq += R0_dot @ posFrload
     uavState[0:3]  = posq
     uavState[3:6]  = velq
     uavState[6:10] = angState[0:4]
@@ -320,7 +327,7 @@ def setTeamParams(params, initUavs):
             quat   = rn.from_euler(eulAng[0], eulAng[1], eulAng[2])
             w_i    = robot['initConditions']['init_angVel_Q']
             angSt  = np.hstack((quat, w_i)).reshape((7,))
-            uav1   = uav.UavModel(dt, StatefromSharedPayload(payload, angSt, lc, j), robot, pload=True, lc=lc)
+            uav1   = uav.UavModel(dt, 'uav_'+name, StatefromSharedPayload('uav_'+name, payload, angSt, lc, j), robot, pload=True, lc=lc)
             j +=3
             uavs['uav_'+name] = uav1    
     else:
@@ -331,7 +338,7 @@ def setTeamParams(params, initUavs):
             trajectories['uav_'+name]   = robot['refTrajPath']
             uavs_params.update({name: {**robot['initConditions'], **robot, 'dt': dt}})
             dt, initState  = initializeState(uavs_params[name])
-            uav1           = uav.UavModel(dt, initState, uavs_params[name])
+            uav1           = uav.UavModel(dt, 'uav_'+name, initState, uavs_params[name])
             uavs['uav_'+name] = uav1
         payload_params, payload = setPayloadfromUAVs(uavs_params, payload_params)
     return plStSize, uavs, uavs_params, payload, trajectories, pltrajectory
@@ -340,7 +347,7 @@ def setTeamParams(params, initUavs):
 def initPLController(payload):
     """This function initializes the controller"""
     if payload.ctrlType == 'lee':
-        cffirmware.controllerLeePayloadFimrwareInit() 
+        cffirmware.controllerLeePayloadInit() 
     elif payload.ctrlType == 'lee_firmware':
         leePayload = cffirmware.controllerLeePayload_t()
         cffirmware.controllerLeePayloadInit(leePayload)
@@ -444,7 +451,9 @@ def updatePlDesState(setpoint, payload, fulltraj):
             setpoint.snap.y = 0 
             setpoint.snap.z = 0 
     if not payload.pointmass:
-        pass
+        setpoint.attitude.roll = 0
+        setpoint.attitude.pitch = 0
+        setpoint.attitude.roll = 0
     return setpoint
 
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##        
@@ -485,11 +494,19 @@ def main(args, animateOrPlotdict, params):
     # final time of traj in ms
     print('\nTotal Simulation time: '+str(tf_sim*1e-3)+ 's')
     print('Trajectory duration: '+str(tf_ms*1e-3)+ 's\n')
+    print()
+    print('UAVs Initial States: [x y z xdot ydot zdot qw qx qy qz wx wy wz] \n')
+    for key in uavs.keys():
+        print(key, uavs[key].state)
+    print()
     print('Simulating...')
 
     if shared:
         if payload.lead:
+            if payload.ctrlType == 'lee_firmware':
                 leePayload, control, setpoint, sensors, state = initPLController(payload)
+            elif payload.ctrlType == 'lee':
+                control, setpoint, sensors, state = initPLController(payload)
         else:
             controls, setpoints, sensors_, states, lees =  {}, {}, {}, {}, {} 
             for id in uavs.keys():
@@ -545,9 +562,7 @@ def main(args, animateOrPlotdict, params):
                 if payload.lead:
                     ## Choose controller: Python or firmware
                     if payload.ctrlType == 'lee':
-                        control = cffirmware.controllerLeePayload(uavs[id], payload, control, setpoint, sensors, state, tick, j)
-                        torquesTick, des_w, des_wd = cffirmware.torqueCtrlwPayload(uavs[id], control.thrustSI, payload,  setpoint, tick*1e-3)
-                        control.torque = np.array([torquesTick[0], torquesTick[1], torquesTick[2]])
+                        control, des_w, des_wd = cffirmware.controllerLeePayload(uavs[id], payload, control, setpoint, sensors, state, tick, j)
                         ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)
                     elif payload.ctrlType == 'lee_firmware':
                         leePayload.l = uavs[id].lc
@@ -582,6 +597,7 @@ def main(args, animateOrPlotdict, params):
                     sensors_[id]  = sensors
                     states[id]    = state
                 j+=3
+                uavs[id].stackStandCtrl(uavs[id].state, control_inp, ref_state)                   
             payload.cursorUp() 
             # Evolve the payload states
             uavs, loadState =  payload.stateEvolution(ctrlInputs, uavs, uavs_params)
@@ -590,14 +606,13 @@ def main(args, animateOrPlotdict, params):
             else:
                 payload.stackState()
             ## Evolve the states of the uav based on the Payload state
-            i = plStSize
+            i = plStSize    
             for id in uavs.keys():
-                uavs[id].state = StatefromSharedPayload(payload, uavs[id].state[6::], uavs[id].lc, i)
-                uavs[id].stackStandCtrl(uavs[id].state, control_inp, ref_state)
+                uavs[id].state = StatefromSharedPayload(id, payload, uavs[id].state[6::], uavs[id].lc, i)
                 i +=3    
-        payload.cursorPlUp()
         for id in uavs.keys():
             uavs[id].cursorUp()
+        payload.cursorPlUp()
         ## Animate or plot based on flags
         animateOrPlot(uavs, payload, animateOrPlotdict, filename, tf_sim, shared)
 

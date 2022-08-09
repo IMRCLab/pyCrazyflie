@@ -144,7 +144,6 @@ def plotPayloadStates(payload, posq, tf_sim, shared):
 
 ###############################################################################################
     norm_x = np.zeros((len(full_state),))
-
     for i in range(0, len(norm_x)):
         norm_x[i] = np.linalg.norm(pos[i,:] - posq[i,:])
     ax15.plot(time, norm_x,c='k',lw=1, label='Norm')
@@ -267,7 +266,7 @@ def outputPlots(uavs, payloads, tf_sim, pdfName, shared):
         ax3[0].plot(time, angVel[:,0],c='k',lw=0.75,label='Actual')
         ax3[1].plot(time, angVel[:,1],c='k',lw=0.75,label='Actual')
         ax3[2].plot(time, angVel[:,2],c='k',lw=0.75,label='Actual')
-        if uav_.controller['name'] in 'lee':
+        if uav_.controller['name'] == 'lee':
             ax3[0].plot(time, angVeldes[:,0],lw=0.75, c='darkgreen',label='Reference')
             ax3[1].plot(time, angVeldes[:,1],lw=0.75, c='darkgreen',label='Reference')
             ax3[2].plot(time, angVeldes[:,2],lw=0.75, c='darkgreen',label='Reference')
@@ -279,7 +278,7 @@ def outputPlots(uavs, payloads, tf_sim, pdfName, shared):
         create_subtitle(fig3, grid[0, ::], 'Actual vs Reference Angular Velocities')
 
         ###################################
-        if uav_.controller['name'] in 'lee':
+        if uav_.controller['name'] == 'lee':
             ax13[0].plot(time, angAcc[:,0],c='k',lw=0.75,label='Actual'), ax13[0].plot(time, angAccdes[:,0],lw=0.75, c='darkgreen',label='Reference')
             ax13[1].plot(time, angAcc[:,1],c='k',lw=0.75,label='Actual'), ax13[1].plot(time, angAccdes[:,1],lw=0.75, c='darkgreen',label='Reference')
             ax13[2].plot(time, angAcc[:,2],c='k',lw=0.75,label='Actual'), ax13[2].plot(time, angAccdes[:,2],lw=0.75, c='darkgreen',label='Reference')
@@ -365,7 +364,7 @@ def outputPlots(uavs, payloads, tf_sim, pdfName, shared):
             fig10.savefig(f, format='pdf', bbox_inches='tight')
             fig11.savefig(f, format='pdf', bbox_inches='tight')
             fig12.savefig(f, format='pdf', bbox_inches='tight')
-    
+        
     f.close()
 
 
@@ -417,8 +416,8 @@ class PlotandAnimate:
         self.vec1d = self.ax.quiver([],[],[],[],[],[])
         self.vec2d = self.ax.quiver([],[],[],[],[],[])
         self.vec3d = self.ax.quiver([],[],[],[],[],[])
-        self.armb1  = np.array([[self.uavModel.d*10**(0.64)*np.cos(0)], [self.uavModel.d*10**(0.64)*np.sin(0)] ,[0]])
-        self._armb1 = np.array([[-self.uavModel.d*10**(0.64)*np.cos(0)], [-self.uavModel.d*10**(0.64)*np.sin(0)] ,[0]])
+        self.armb1  = np.array([[self.uavModel.d*10**(0.40)*np.cos(0)], [self.uavModel.d*10**(0.40)*np.sin(0)] ,[0]])
+        self._armb1 = np.array([[-self.uavModel.d*10**(0.40)*np.cos(0)], [-self.uavModel.d*10**(0.40)*np.sin(0)] ,[0]])
         q90z        = rn.from_euler(0, 0, np.radians(90),convention='xyz')
         rot90z      = rn.to_matrix(q90z)
         self.armb2  = rot90z @ (self.armb1.reshape(3,))
@@ -564,7 +563,7 @@ class PlotandAnimate:
             self.drawActvsRefTraj(x, y, z, xref, yref, zref)
             self.drawQuadrotorArms(x[i], y[i], z[i], armI1, armI2, _armI1, _armI2)
 
-            Xb,Yb,Zb = RotatedCylinder(0,0,0.1,0.1,q) 
+            Xb,Yb,Zb = RotatedCylinder(0,0,0.06,0.1,q) 
             self.drawPropellers(Xb, Yb, Zb,armI1, armI2, _armI1, _armI2)
         
         return self.line, 
