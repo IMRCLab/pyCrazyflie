@@ -623,7 +623,5 @@ class PlotandAnimate:
         return np.array(x), np.array(y), np.array(z)
 
     def plotCubeAt(self, pos, size,**kwargs):
-        # Plotting a cube element at position pos
-        
         X, Y, Z = self.cuboid_data( pos, size )
         self.ax.plot_surface(X, Y, Z, rstride=1, cstride=1, color='grey', alpha=0.1,antialiased=False)
