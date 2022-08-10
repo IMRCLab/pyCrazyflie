@@ -214,7 +214,7 @@ def animateTrajectory(uavs, payloads, videoname, shared):
     # Animation    
     fig     = plt.figure(figsize=(10,10))
     ax      = fig.add_subplot(autoscale_on=True,projection="3d")
-    sample  = 100
+    sample  = 30
     animate = animateSingleUav.PlotandAnimate(fig, ax, uavs, payloads, sample, shared) 
     dt_sampled = list(uavs.values())[0].dt * sample
     print("Starting Animation... \nAnimating, Please wait...")

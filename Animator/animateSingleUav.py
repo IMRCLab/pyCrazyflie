@@ -523,6 +523,13 @@ class PlotandAnimate:
         # self.ax.legend()
 
     def drawPayload(self,x,y,z,xl,yl,zl):
+
+        c_st = np.array([x,y,z])
+        c_en = np.array([xl,yl,zl])
+        self.ax.plot3D(np.linspace(c_st[0], c_en[0]), np.linspace(c_st[1], c_en[1]), np.linspace(c_st[2], c_en[2]), 'darkblue',lw=2)
+    
+    def plotRigidPayloadCables(self, size, x, y ,z, xl, yl, zl):
+        l, w, h = size
         c_st = np.array([x,y,z])
         c_en = np.array([xl,yl,zl])
         self.ax.plot3D(np.linspace(c_st[0], c_en[0]), np.linspace(c_st[1], c_en[1]), np.linspace(c_st[2], c_en[2]), 'darkblue',lw=2)
@@ -553,12 +560,31 @@ class PlotandAnimate:
             armI1, armI2, _armI1, _armI2 = self.getArmpos(x[i],y[i],z[i],q)
 
             if self.uavModel.pload:
-                xl, yl, zl  = self.getPayloadStates(i)
-                self.drawPayload(x[i], y[i], z[i], xl[i], yl[i], zl[i])
-                self.drawPlTraj(xl, yl, zl)
-                r = 0.08
-                xsp, ysp, zsp = Sphere(xl, yl, zl, r)
-                self.ax.plot_surface(xl[i]+xsp, yl[i]+ysp, zl[i]+zsp, cmap=plt.cm.YlGnBu_r)
+                xl, yl, zl  = self.getPayloadStates(i)                
+                if self.shared:
+                    if not self.payload.pointmass:
+                        pos  = (xl[i], yl[i], zl[i])
+                        size = (0.2588, 0.4482, 0.1)
+                        self.plotCubeAt(pos, size)
+                        posFrload = self.payload.posFrloaddict[id]
+                        Rp = rn.to_matrix(self.payload.state[6:10])
+                        posq  = np.array([x[i],y[i],z[i]])
+                        posp = np.array([xl[i], yl[i], zl[i]]) + Rp@posFrload
+                        self.plotRigidPayloadCables(size, x[i], y[i], z[i], posp[0], posp[1], posp[2])
+                    else:
+                        self.drawPayload(x[i], y[i], z[i], xl[i], yl[i], zl[i])
+                        self.drawPlTraj(xl, yl, zl)
+                        r = 0.08
+                        xsp, ysp, zsp = Sphere(xl, yl, zl, r)
+                        self.ax.plot_surface(xl[i]+xsp, yl[i]+ysp, zl[i]+zsp, cmap=plt.cm.YlGnBu_r)
+                       
+                else:    
+                    self.drawPayload(x[i], y[i], z[i], xl[i], yl[i], zl[i])
+                    self.drawPlTraj(xl, yl, zl)
+                    r = 0.08
+                    xsp, ysp, zsp = Sphere(xl, yl, zl, r)
+                    self.ax.plot_surface(xl[i]+xsp, yl[i]+ysp, zl[i]+zsp, cmap=plt.cm.YlGnBu_r)
+        
             self.drawQuivers(x[i],y[i],z[i], q, xref[i], yref[i], zref[i])
             self.drawActvsRefTraj(x, y, z, xref, yref, zref)
             self.drawQuadrotorArms(x[i], y[i], z[i], armI1, armI2, _armI1, _armI2)
@@ -569,3 +595,35 @@ class PlotandAnimate:
         return self.line, 
 
 
+    def cuboid_data(self,o, size=(1,1,1)):
+        l, w, h = size
+        
+        x = [[o[0], o[0] + l, o[0] + l, o[0], o[0]],  
+            [o[0], o[0] + l, o[0] + l, o[0], o[0]],  
+            [o[0], o[0] + l, o[0] + l, o[0], o[0]],  
+            [o[0], o[0] + l, o[0] + l, o[0], o[0]]]  
+      
+        y = [[o[1], o[1], o[1] + w, o[1] + w, o[1]],  
+            [o[1], o[1], o[1] + w, o[1] + w, o[1]],  
+            [o[1], o[1], o[1], o[1], o[1]],          
+            [o[1] + w, o[1] + w, o[1] + w, o[1] + w, o[1] + w]]   
+
+        z = [[o[2], o[2], o[2], o[2], o[2]],                       
+            [o[2] + h, o[2] + h, o[2] + h, o[2] + h, o[2] + h],   
+            [o[2], o[2], o[2] + h, o[2] + h, o[2]],               
+            [o[2], o[2], o[2] + h, o[2] + h, o[2]]]               
+
+        row = len(x)
+        column = len(x[0])
+        for i in range(row):
+            for j in range(column):
+                x[i][j] -=  l/2
+                y[i][j] -=  w/2
+                z[i][j] = z[i][j]
+        return np.array(x), np.array(y), np.array(z)
+
+    def plotCubeAt(self, pos, size,**kwargs):
+        # Plotting a cube element at position pos
+        
+        X, Y, Z = self.cuboid_data( pos, size )
+        self.ax.plot_surface(X, Y, Z, rstride=1, cstride=1, color='grey', alpha=0.1,antialiased=False)
