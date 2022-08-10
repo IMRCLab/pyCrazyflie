@@ -232,6 +232,7 @@ def torqueCtrlwPayload(uavModel, fi, payload, setpoint, tick):
     des_wd  = (computeWddot(m, R, des_w, T, Td, Td_dot, dessnap)).reshape(3,1)
     ew  = (curr_w - Rt @ Rd @ des_w).reshape((3,1))
     torques =  torqueCtrl(I, Rt, curr_w_, kr@er, kw@ew, Rd, des_w, des_wd)   
+
     return torques, des_w, des_wd
 
 def parallelComp(virtualInp, uavModel, payload, j):
@@ -262,15 +263,15 @@ def perpindicularComp(desVirtInp, uavModel, payload, kq, kw, ki, j):
     qi = payload.state[j:j+3]
     wi = payload.state[j+3*payload.numOfquads:j+3+3*payload.numOfquads]   
     qidot = np.cross(wi, qi)
+    
     # P part
     eq = np.cross(qdi, qi)
     wdi = np.cross(qdi, qdidot)
-
     skewqi2 = (uav.skew(qi)@uav.skew(qi))
     # D part
     ew = wi + skewqi2 @ wdi
     wdidot = np.zeros(3,)
-    u_perp = m * l  * uav.skew(qi) @ (- kq @ eq - kw @ ew - np.dot(qi, wdi)*qidot - skewqi2@wdidot) - m * skewqi2 @ acc0 
+    u_perp = m * l  * uav.skew(qi) @ (- kq @ eq - kw @ ew) - m * skewqi2 @ acc0 # - np.dot(qi, wdi)*qidot - skewqi2@wdidot)
     
     return u_perp
 
@@ -341,7 +342,7 @@ def controllerLeePayload(uavModel, payload, control, setpoint, sensors, state, t
         rows = 6
         erp = 0.5* flatten(Rdp.T @ Rp - Rp.T @ Rdp)
         ewp = payload.state[10:13] - Rp.T @ Rdp @ wdp
-        Md = -krp@erp - kwp@ewp + uav.skew(Rp.T @ Rdp @ wdp) @ payload.J @ Rp.T @ Rdp @ wdp 
+        Md = -krp@erp - kwp@ewp # + uav.skew(Rp.T @ Rdp @ wdp) @ payload.J @ Rp.T @ Rdp @ wdp 
         Ud = np.array([Rp @ Fd.reshape(3,), Md]).reshape(6,)
     quadNums = payload.numOfquads
     P = np.zeros((rows, 3*quadNums))
@@ -354,8 +355,10 @@ def controllerLeePayload(uavModel, payload, control, setpoint, sensors, state, t
         if not payload.pointmass:
             P[3::,i:i+3] = uav.skew(payload.posFrload[k,:]) 
             k+=1
+    P_inv = P.T @ np.linalg.inv(P@P.T)
     
-    desVirtInp =(R_p_diag) @ (np.linalg.pinv(P) @ (Ud.reshape(rows,))).reshape(3*quadNums,)
+    desVirtInp =(R_p_diag) @ (P_inv) @ (Ud.reshape(rows,))
+    
     if not payload.pointmass:
         desVirtInp = desVirtInp[j-6-7:j-3-7]
     else:   
@@ -369,9 +372,8 @@ def controllerLeePayload(uavModel, payload, control, setpoint, sensors, state, t
     
     R = rn.to_matrix(uavModel.state[6:10])
     Re3 = R@np.array([0,0,1])
-    
     control.thrustSI = np.linalg.norm(control.u_all)
     torquesTick, des_w, des_wd = torqueCtrlwPayload(uavModel, control.u_all, payload,  setpoint, tick*1e-3)
     control.torque = np.array([torquesTick[0], torquesTick[1], torquesTick[2]])
-
+  
     return control, des_w, des_wd

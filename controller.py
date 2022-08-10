@@ -214,7 +214,7 @@ def animateTrajectory(uavs, payloads, videoname, shared):
     # Animation    
     fig     = plt.figure(figsize=(10,10))
     ax      = fig.add_subplot(autoscale_on=True,projection="3d")
-    sample  = 30
+    sample  = 10
     animate = animateSingleUav.PlotandAnimate(fig, ax, uavs, payloads, sample, shared) 
     dt_sampled = list(uavs.values())[0].dt * sample
     print("Starting Animation... \nAnimating, Please wait...")
@@ -269,10 +269,10 @@ def StatefromSharedPayload(id, payload, angState, lc, j):
     if not payload.pointmass:
         R0   = rn.to_matrix(payload.state[6:10])
         posFrload = payload.posFrloaddict[id]
-        posq += R0@posFrload
+        posq = payload.state[0:3] - lc * qi + R0@posFrload
         wl = payload.state[10:13] #wl of payload
         R0_dot = R0@uav.skew(wl)
-        velq += R0_dot @ posFrload
+        velq = payload.state[3:6] - lc * pdot + R0_dot @ posFrload
     uavState[0:3]  = posq
     uavState[3:6]  = velq
     uavState[6:10] = angState[0:4]
@@ -584,6 +584,7 @@ def main(args, animateOrPlotdict, params):
                         des_w, des_wd  = np.zeros(3,), np.zeros(3,)
                         ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)        
                 control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
+                # print(control_inp)
                 ctrlInputs  = np.vstack((ctrlInputs, control_inp.reshape(1,4)))
                 Re3 = rn.to_matrix(uavs[id].state[6:10])@np.array([0,0,1])
                 if payload.lead:

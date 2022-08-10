@@ -148,8 +148,7 @@ class SharedPayload:
     def getBq(self, uavs_params):
         Bq = np.zeros((self.sys_dim, self.sys_dim))
         Bq[0:3,0:3] = self.mt*np.identity(3)
-        if not self.pointmass:
-            Bq[3:6, 3:6] = self.J
+       
         i = self.plSysDim
         k = self.plStateSize
         for name, uav in uavs_params.items():
@@ -164,11 +163,14 @@ class SharedPayload:
                 R_p = to_matrix(self.state[6:10])
                 posFrload = np.array(uav['pos_fr_payload'])
                 qiqiT = qi.reshape((3,1))@(qi.T).reshape((1,3))
-                Bq[0:3, 3:6]   -=  m * qiqiT @ R_p @ skew(posFrload)
+                Bq[0:3, 3:6]   +=  m * qiqiT @ R_p @ skew(posFrload)
                 Bq[3:6, 0:3]   +=  m * skew(posFrload) @ R_p.T @ qiqiT
-                Bq[3:6, 3:6]   -=  m * skew(posFrload) @ R_p.T @ qiqiT @ R_p @ skew(posFrload)
-                Bq[i:i+3, 3:6] -=  m * skew(qi) @ R_p @ skew(posFrload) 
+                Bq[3:6, 3:6]   +=  m * skew(posFrload) @ R_p.T @ qiqiT @ R_p @ skew(posFrload)
+                Bq[i:i+3, 3:6]  =  m * skew(qi) @ R_p @ skew(posFrload) 
             i+=3
+        if not self.pointmass:
+            Bq[0:3, 3:6] *= -1
+            Bq[3:6, 3:6] = self.J - Bq[3:6, 3:6]
         return Bq
 
     def getNq(self, uavs_params):
@@ -178,12 +180,10 @@ class SharedPayload:
         term = np.zeros((3,))
         Mq   = self.mt*np.identity(3)
 
-        Nq[0:3] = Mq @ np.array([0,0,-self.g])
         if not self.pointmass:
             R_p = to_matrix(self.state[6:10])
             wl = self.state[10:13]            
-            Nq[3:6] = -skew(wl) @ self.J @ wl
-
+           
         for name, uav in uavs_params.items():
             m = float(uav['m'])
             l = float(uav['l_c'])
@@ -192,17 +192,22 @@ class SharedPayload:
             wi = self.state[k+3*self.numOfquads:k+3+3*self.numOfquads]
             k+=3
 
-            Nq[0:3]  -=  m*l*np.dot(wi,wi)*qi # Lee 2018
-            Nq[i:i+3] = -m*skew(qi) @ np.array([0,0,-self.g]) # Lee 2018
-
-            if not self.pointmass:
+            if self.pointmass:
+                Nq[0:3]  -=  m*l*np.dot(wi,wi)*qi # Lee 2018
+                Nq[i:i+3] = -m*skew(qi) @ np.array([0,0,-self.g]) # Lee 2018
+            else:
                 posFrload = np.array(uav['pos_fr_payload'])
                 qiqiT = qi.reshape((3,1))@(qi.T).reshape((1,3))
-                Nq[0:3]   -=  m * qiqiT @ R_p @skew(wl) @skew(wl) @ posFrload
-                Nq[3:6]   += -m*skew(posFrload) @ R_p.T @ qiqiT @ np.array([0,0,-self.g]) +\
-                             skew(posFrload) @ R_p.T @ ((-m *l * np.dot(wi, wi) * qi) - (m * qiqiT @ R_p @ skew(wl) @skew(wl) @ posFrload ))
-                Nq[i:i+3] += m*l*skew(qi) @ R_p @ skew(wl) @skew(wl) @ posFrload  
+                Nq[0:3]   += (-m*l*np.dot(wi,wi)*qi - m * qiqiT @ R_p @skew(wl) @skew(wl) @ posFrload)
+                Nq[3:6]   += (-m*skew(posFrload) @ R_p.T @ qiqiT @ np.array([0,0,-self.g]) -\
+                             skew(posFrload) @ R_p.T @ ((m *l * np.dot(wi, wi) * qi) + (m * qiqiT @ R_p @ skew(wl) @skew(wl) @ posFrload )))
+
+                Nq[i:i+3] = -m*skew(qi) @ np.array([0,0,-self.g]) + m*skew(qi) @ R_p @ skew(wl) @skew(wl) @ posFrload  
             i+=3
+
+        Nq[0:3] = Nq[0:3] + Mq @ np.array([0,0,-self.g])
+        if not self.pointmass:
+            Nq[3:6] = Nq[3:6] - skew(wl) @ self.J @ wl
 
         return Nq
 
@@ -223,11 +228,12 @@ class SharedPayload:
             k+=3
             
             qiqiT = qi.reshape((3,1))@(qi.T).reshape((1,3))
-            u_inp[0:3] += qiqiT @ self.ctrlInp[i,:]
+            u_par = qiqiT @ self.ctrlInp[i,:]
+            u_inp[0:3] += u_par
             u_perp = ((np.eye(3) - qiqiT) @  self.ctrlInp[i,:])
             u_inp[j:j+3] =  -skew(qi) @ u_perp
             if not self.pointmass:
-                u_inp[3:6] += skew(posFrload)@R_p.T @ qiqiT @ self.ctrlInp[i,:]
+                u_inp[3:6] += skew(posFrload)@R_p.T @ u_par
             i+=1
             j+=3
         return u_inp
@@ -247,11 +253,11 @@ class SharedPayload:
             quat_p = self.state[6:10]
             wp = self.state[10:13]     
         
-        self.state[3:6] = accl[0:3] * self.dt + vp #xp_next
-        self.state[0:3] = vp * self.dt + xp  #vp_next
+        self.state[3:6] = accl[0:3] * self.dt + vp #vp_next
+        self.state[0:3] = vp * self.dt + xp  #xp_next
 
         if not self.pointmass:
-            self.state[10:13] = accl[3:6] + self.dt + wp #wp_next
+            self.state[10:13] = accl[3:6]*self.dt + wp #wp_next
         k = self.plStateSize        
         j = self.plSysDim
         for i in range(0, self.numOfquads):
