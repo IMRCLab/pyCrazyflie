@@ -3,6 +3,8 @@ import rowan as rn
 from uavDy import uav
 from scipy import linalg as la
 import sys
+import cvxpy as cp
+
 modeAbs     = 0
 modeDisable = 1
 modeVelocity = 2
@@ -282,8 +284,8 @@ def perpindicularComp(desVirtInp, uavModel, payload, kq, kw, ki, j, tick):
     u_perp = m * l  * uav.skew(qi) @ (-kq @ eq - kw @ ew- np.dot(qi, wdi)*qidot - skewqi2@wdidot) - m * skewqi2 @ acc0 
     return u_perp
 
-def controllerLeePayload(uavModel, payload, control, setpoint, sensors, state, tick, j):
-
+def controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, tick, j):
+    uavModel = uavs[id]
     kpx      = float(payload.controller['kpx'])
     kpy      = float(payload.controller['kpy'])
     kpz      = float(payload.controller['kpz'])
@@ -362,9 +364,11 @@ def controllerLeePayload(uavModel, payload, control, setpoint, sensors, state, t
         if not payload.pointmass:
             P[3::,i:i+3] = uav.skew(payload.posFrload[k,:]) 
             k+=1
-    P_inv = P.T @ np.linalg.inv(P@P.T)
-    
-    desVirtInp =(R_p_diag) @ (P_inv) @ (Ud.reshape(rows,))
+    if payload.optimize:
+        desVirtInp = qpVBC(uavs, payload, Ud.reshape(rows,), P)
+    else:
+        P_inv = P.T @ np.linalg.inv(P@P.T)
+        desVirtInp = (R_p_diag) @ (P_inv) @ (Ud.reshape(rows,))
     if not payload.pointmass:
         desVirtInp = desVirtInp[j-6-7:j-3-7]
     else:   
@@ -382,3 +386,17 @@ def controllerLeePayload(uavModel, payload, control, setpoint, sensors, state, t
     control.torque = np.array([torquesTick[0], torquesTick[1], torquesTick[2]])
 
     return control, des_w, des_wd
+
+
+def qpVBC(uavs, payload, Ud, P):
+    size = 3*payload.numOfquads
+    mu = cp.Variable((size,))
+   
+    Q = np.eye(size)
+    objective   = cp.Minimize((1/2)*cp.quad_form(mu, Q))
+ 
+    constraints = [P@mu == Ud]
+    prob = cp.Problem(objective, constraints)
+    prob.solve()
+    mu = mu.value 
+    return mu

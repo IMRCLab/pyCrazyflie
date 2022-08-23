@@ -563,7 +563,7 @@ def main(args, animateOrPlotdict, params):
                 if payload.lead:
                     ## Choose controller: Python or firmware
                     if payload.ctrlType == 'lee':
-                        control, des_w, des_wd = cffirmware.controllerLeePayload(uavs[id], payload, control, setpoint, sensors, state, tick, j)
+                        control, des_w, des_wd = cffirmware.controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, tick, j)
                         ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)
                     elif payload.ctrlType == 'lee_firmware':
                         leePayload.l = uavs[id].lc

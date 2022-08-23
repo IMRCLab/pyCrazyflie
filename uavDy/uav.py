@@ -92,8 +92,14 @@ class SharedPayload:
         self.cablegains = payload_params['payloadCtrl']['gains']['cable']
         self.ctrlType   = payload_params['payloadCtrl']['name']
         self.offset     = float(payload_params['payloadCtrl']['offset'])
+        self.optimize   = payload_params['payloadCtrl']['optimize']
         self.posFrload = np.empty((1,3))
         self.posFrloaddict = {}
+
+        if self.optimize == 'enabled':
+            self.optimize == True
+        else: 
+            self.optimize = False
         for name, uav in uavs_params.items():
             self.posFrload = np.vstack((self.posFrload, np.array(uav['pos_fr_payload']).reshape((1,3))))
             self.mt_   += float(uav['m']) # Mass of quadrotors [kg] 
