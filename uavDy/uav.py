@@ -4,7 +4,7 @@ from rowan.functions import _promote_vec, _validate_unit, exp, multiply
 from rowan import from_matrix, to_matrix, to_euler, from_euler
 from scipy import  integrate, linalg
 from numpy.polynomial import Polynomial as poly
-
+import sys
 
 def skew(w):
     w = w.reshape(3,1)
@@ -84,7 +84,6 @@ class SharedPayload:
         self.J = np.diag(payload_params['inertia'])
         self.mt_  = 0
         self.numOfquads = 0
-        self.J_bar_term = np.zeros((3,3))
         if payload_params['payloadCtrl']['payloadLead'] == 'enabled':
             self.lead = True
         else: 
@@ -94,26 +93,36 @@ class SharedPayload:
         self.ctrlType   = payload_params['payloadCtrl']['name']
         self.offset     = float(payload_params['payloadCtrl']['offset'])
         self.posFrload = np.empty((1,3))
+        self.posFrloaddict = {}
         for name, uav in uavs_params.items():
             self.posFrload = np.vstack((self.posFrload, np.array(uav['pos_fr_payload']).reshape((1,3))))
             self.mt_   += float(uav['m']) # Mass of quadrotors [kg] 
-            self.J_bar_term += self.mt_ * skew(np.array(uav['pos_fr_payload']))@ skew(np.array(uav['pos_fr_payload']))
-            self.numOfquads += 1
-        self.J_bar = self.J - self.J_bar_term      
+            self.numOfquads += 1   
         self.mt    = self.mp + self.mt_ # total mass of quadrotors and payload
         self.grav_ = np.array([0,0,-self.mt*self.g])
         #state = [xp, yp, zp, xpd, ypd, zpd, qwp, qxp, qyp, qzp, wpx, wpy, wpz, q1,...,qn, w1,...,wn]
         self.plSysDim    = 6
         self.plStateSize = 13
-        if np.linalg.det(self.J_bar) == 0:
+        self.pointmass   = False
+
+        if np.linalg.det(self.J) == 0:
             self.plSysDim -= 3
             self.plStateSize -= 7
             self.pointmass = True
-            self.posFrload = np.delete(self.posFrload, 0, 0)
+        self.posFrload = np.delete(self.posFrload, 0, 0)
+        self.qdi_prevdict  = {}
+        self.wdi_prevdict  = {}
+        z = 0
+        for name in uavs_params.keys():
+            self.posFrloaddict['uav_'+name] = self.posFrload[z,:]
+            self.qdi_prevdict['uav_'+name] = np.array([0,0,-1])
+            self.wdi_prevdict['uav_'+name] = np.array([0,0,0])
+            z+=1
         self.sys_dim    = self.plSysDim + 3*self.numOfquads
         self.state_size = self.plStateSize + 6*self.numOfquads #13 for the payload and (3+3)*n for each cable angle and its derivative    
-        self.plstate = np.empty((1,16+3*self.numOfquads))
-        self.plFullState = np.empty((1,16+3*self.numOfquads))
+
+        self.plstate = np.empty((1,self.state_size))
+        self.plFullState = np.empty((1,self.state_size))
         self.ctrlInp = np.empty((1,3))
         self.plref_state = np.empty((1,6))
         self.state, self.prevSt = self.getInitState(uavs_params, payload_params)
@@ -143,8 +152,7 @@ class SharedPayload:
     def getBq(self, uavs_params):
         Bq = np.zeros((self.sys_dim, self.sys_dim))
         Bq[0:3,0:3] = self.mt*np.identity(3)
-        if not self.pointmass:
-            Bq[3:6,3:6] = self.J_bar
+       
         i = self.plSysDim
         k = self.plStateSize
         for name, uav in uavs_params.items():
@@ -152,141 +160,142 @@ class SharedPayload:
             l = float(uav['l_c'])
             qi = self.state[k:k+3]
             k+=3
-            if not self.pointmass:
-                R_p = to_matrix(self.state[6:10])
-                posFrload = uav['pos_fr_payload']
             Bq[i:i+3,0:3]    = -m*skew(qi) # Lee 2018
             Bq[i:i+3, i:i+3] = m*(l)*np.identity(3) # Lee 2018
+
             if not self.pointmass:
-                Bq[0:3, 3:6]  += -m * R_p @ skew(np.array(posFrload))
-                Bq[3:6,0:3]   +=  m * skew(np.array(posFrload)) @ np.transpose(R_p) 
-                Bq[i:i+3, 3:6] = m*l*skew(qi) @ R_p @ skew(np.array(posFrload))
-                Bq[3:6, i:i+3] = m*l*skew(np.array(posFrload)) @ np.transpose(R_p) @ skew(qi)
+                R_p = to_matrix(self.state[6:10])
+                posFrload = np.array(uav['pos_fr_payload'])
+                qiqiT = qi.reshape((3,1))@(qi.T).reshape((1,3))
+                Bq[0:3, 3:6]   +=  m * qiqiT @ R_p @ skew(posFrload)
+                Bq[3:6, 0:3]   +=  m * skew(posFrload) @ R_p.T @ qiqiT
+                Bq[3:6, 3:6]   +=  m * skew(posFrload) @ R_p.T @ qiqiT @ R_p @ skew(posFrload)
+                Bq[i:i+3, 3:6]  =  m * skew(qi) @ R_p @ skew(posFrload) 
             i+=3
+        if not self.pointmass:
+            Bq[0:3, 3:6] = -Bq[0:3, 3:6]
+            Bq[3:6, 3:6] = self.J - Bq[3:6, 3:6]
         return Bq
 
     def getNq(self, uavs_params):
         Nq =  np.zeros((self.sys_dim,))
         i = self.plSysDim
         k = self.plStateSize
-        term = np.zeros((3,))
         Mq   = self.mt*np.identity(3)
+
+        if not self.pointmass:
+            R_p = to_matrix(self.state[6:10])
+            wl = self.state[10:13]            
+           
         for name, uav in uavs_params.items():
             m = float(uav['m'])
             l = float(uav['l_c'])
-            if not self.pointmass:
-                posFrload = np.array(uav['pos_fr_payload'])
-                R_p = to_matrix(self.state[6:10])
-                wl = self.state[10:13]
+            
             qi = self.state[k:k+3]
             wi = self.state[k+3*self.numOfquads:k+3+3*self.numOfquads]
             k+=3
-            Nq[0:3]  -=  m*l*np.dot(wi,wi)*qi # Lee 2018
-            Nq[i:i+3] = -m*skew(qi) @ np.array([0,0,-self.g]) # Lee 2018
-            if not self.pointmass:
-                Nq[0:3]  += m*R_p @ skew(wl) @skew(wl) @ posFrload
-                Nq[3:6]  += m*l*skew(posFrload) @ np.transpose(R_p)*(np.linalg.norm(wi))**2 @ qi
-                term     += skew(posFrload)@ np.transpose(R_p) @  np.array([0,0,-m*self.g])
-                Nq[i:i+3] = m*l*skew(qi) @ R_p @ skew(wl) @skew(wl) @ posFrload  
+
+            if self.pointmass:
+                Nq[0:3]  +=  m*l*np.dot(wi,wi)*qi # Lee 2018
+                Nq[i:i+3] = -m*skew(qi) @ np.array([0,0,-self.g]) # Lee 2018
+
+            else:
+                posFrload = np.array(uav['pos_fr_payload'])
+                qiqiT = qi.reshape((3,1))@(qi.T).reshape((1,3))
+                Nq[0:3]   += (-m*l*np.dot(wi,wi)*qi - m * qiqiT @ R_p @skew(wl) @skew(wl) @ posFrload)
+                Nq[3:6]   += (m*skew(posFrload) @ R_p.T @ qiqiT @ np.array([0,0,-self.g]) +\
+                             skew(posFrload) @ R_p.T @ ((-m *l * np.dot(wi, wi) * qi) - (m * qiqiT @ R_p @ skew(wl) @skew(wl) @ posFrload )))
+
+                Nq[i:i+3] = -m*skew(qi) @ np.array([0,0,-self.g]) + m*skew(qi) @ R_p @ skew(wl) @ skew(wl) @ posFrload  
             i+=3
-        Nq[0:3] += Mq @ np.array([0,0,-self.g])
+
+        Nq[0:3] = -Nq[0:3] + Mq @ np.array([0,0,-self.g])
         if not self.pointmass:
-            Nq[3:6] = -skew(wl)@self.J_bar@wl - Nq[3:6] + term
+            Nq[3:6] = Nq[3:6] - skew(wl) @ self.J @ wl
         return Nq
 
     def getuinp(self, uavs_params):        
         u_inp = np.zeros((self.sys_dim,))
         i, j, k = 0, self.plSysDim, self.plStateSize
+
         for name, uav in uavs_params.items():
             m = float(uav['m'])
             l = float(uav['l_c'])
+            u_i = self.ctrlInp[i,:]
             if not self.pointmass:
                 R_p = to_matrix(self.state[6:10])
                 wl = self.state[10:13]
                 posFrload = np.array(uav['pos_fr_payload'])
+     
             qi = self.state[k:k+3]
             wi = self.state[k+3*self.numOfquads:k+3+3*self.numOfquads]
             k+=3
+            
             qiqiT = qi.reshape((3,1))@(qi.T).reshape((1,3))
-            u_inp[0:3] += qiqiT @ self.ctrlInp[i,:]
-            u_perp = ((np.eye(3) - qiqiT) @  self.ctrlInp[i,:])
+        
+            u_par = qiqiT @ u_i    
+            u_inp[0:3] += u_par
+            
+            u_perp = ((np.eye(3) - qiqiT) @  u_i)
             u_inp[j:j+3] =  -skew(qi) @ u_perp
+
             if not self.pointmass:
-                u_inp[3:6] += skew(posFrload)@np.transpose(R_p) @ self.ctrlInp[i,:]
-                u_inp[j:j+3] += m * l * skew(qi) @ R_p @ skew(wl) @ skew(wl) @ posFrload
+                u_inp[3:6] += skew(posFrload)@R_p.T @ u_par
             i+=1
             j+=3
         return u_inp
 
-    def getNextState(self, accl):
+    def getNextState(self):
         # if not pointmass:
             #state = [xp, yp, zp, xpd, ypd, zpd, qwp, qxp, qyp, qzp, wpx, wpy, wpz, q1,...,qn, w1,..,wn]
         #else:
             #state = [xp, yp, zp, xpd, ypd, zpd, q1,...,qn, w1,...,wn]
-        currVl  = np.zeros(self.sys_dim)
-        currPos = np.zeros(self.sys_dim)
-        currPos[0:3]  = self.state[0:3]
-        currVl[0:3]   = self.state[3:6]
         if not self.pointmass:
-            currPos[3:7] = self.state[6:10]
-            currVl[3:6] = self.state[10:13]     
-        posNext = np.zeros_like(currPos)
-        velNext = np.zeros_like(currVl)  
-        velNext[0:3] = accl[0:3] * self.dt + currVl[0:3]
-        posNext[0:3] = currVl[0:3] * self.dt + currPos[0:3]
+            posNext = np.zeros(self.sys_dim+1)
+        xp  = self.state[0:3]
+        vp  = self.state[3:6]
+        if not self.pointmass:
+            quat_p = self.state[6:10]
+            wp = self.state[10:13]  
+            self.state[10:13] = self.accl[3:6]*self.dt + wp #wp_next
+            self.state[6:10] = self.integrate_quat(quat_p, wp, self.dt) # payload quaternion (atttitude)   
+
+        self.state[0:3] = vp * self.dt + xp  #xp_next        
+        self.state[3:6] = self.accl[0:3] * self.dt + vp #vp_next
         k = self.plStateSize        
         j = self.plSysDim
         for i in range(0, self.numOfquads):
             qi = self.state[k:k+3]
             wi = self.state[k+3*self.numOfquads:k+3+3*self.numOfquads]
-            currVl[j:j+3] = wi
-            wdi = accl[j:j+3]
-            velNext[j:j+3] = wdi*self.dt + wi
-            if not self.pointmass:
-                currPos[j+1:j+4] = qi
-                qd = np.cross(wi, qi)
-                posNext[j+1:j+4] = qd*self.dt + qi  
-            else:
-                currPos[j:j+3] = qi
-                qd = np.cross(wi, qi)
-                posNext[j:j+3] = qd*self.dt + qi  
-                qi = posNext[j:j+3]
+            wdi = self.accl[j:j+3]
+            self.state[k+3*self.numOfquads:k+3+3*self.numOfquads] = wdi*self.dt + wi # wi_next: cables angular velocity
+            qdot = np.cross(wi, qi) # qdot 
+            self.state[k:k+3] = qdot*self.dt + qi # qi_next: cables directional vectors
             k+=3
             j+=3
-        if not self.pointmass:
-            posNext[3:7] = quat_integrate(currPos[3:7], currVl[3:6], self.dt)        
-        return velNext, posNext
 
     def stateEvolution(self, ctrlInputs, uavs, uavs_params):
         ctrlInputs = np.delete(ctrlInputs, 0,0)
         Bq    = self.getBq(uavs_params)
         Nq    = self.getNq(uavs_params)
         u_inp = self.getuinp(uavs_params)
-        self.accl = np.linalg.inv(Bq)@(Nq + u_inp)
-        self.prevSt = self.state.copy()
-        velNext, posNext = self.getNextState(self.accl)
-        self.state[0:3]   = posNext[0:3]
-        self.state[3:6]   = velNext[0:3]
-        if not self.pointmass:
-            self.state[6:10]  = posNext[3:7]
-            self.state[10:13] = velNext[3:6]
+        
         k = self.plStateSize
         j = self.plSysDim
         self.plstate[0,0:3] = self.state[0:3]
         self.plstate[0,3:6] = self.state[3:6]
+        self.plstate[0,6:10] = self.state[6:10]
         for i in range(0, self.numOfquads):
-            if not self.pointmass:
-                self.state[k:k+3] = posNext[j+1:j+4]
-                self.state[k+1+3*self.numOfquads:k+4+3*self.numOfquads] = velNext[j:j+3]
-                self.plstate[0,k:k+3] = self.state[k:k+3]
-                self.plstate[0,k+1+3*self.numOfquads:k+4+3*self.numOfquads] = velNext[j:j+3]
-            else:
-                self.state[k:k+3] = posNext[j:j+3]
-                self.plstate[0,k:k+3] = self.state[k:k+3]
-                self.state[k+3*self.numOfquads:k+3+3*self.numOfquads] = velNext[j:j+3]
-                self.plstate[0,k+3*self.numOfquads:k+3+3*self.numOfquads] = velNext[j:j+3]
+            self.plstate[0,k:k+3] = self.state[k:k+3]
+            self.plstate[0,k+3*self.numOfquads:k+3+3*self.numOfquads] = self.state[k+3*self.numOfquads:k+3+3*self.numOfquads]
             k+=3
             j+=3
+
+        self.accl = np.linalg.inv(Bq)@(Nq + u_inp)
+        self.prevSt = self.state.copy()
+        self.getNextState()
+        self.ctrlInp = np.array(np.empty((1,3)))
+
         m, k = 0 , self.plStateSize
         for id in uavs.keys():
             tau = ctrlInputs[m,1::].reshape(3,)
@@ -314,7 +323,10 @@ class SharedPayload:
 
     def cursorUp(self):
         self.ctrlInp = np.delete(self.ctrlInp, 0, 0)
-       
+
+    def integrate_quat(self, q, wb, dt):
+        return multiply(q, exp(_promote_vec(wb * dt / 2))) 
+      
 
 class UavModel:
     """initialize an instance of UAV object with the following physical parameters:
@@ -323,13 +335,14 @@ class UavModel:
             0.830806 16.655602 1.800197    -----------------> Moment of Inertia 
             0.718277 1.800197 29.261652)*10^-6 [kg.m^2]"""
 
-    def __init__(self, dt, state, uav_params, pload=False, lc=0):
+    def __init__(self, dt, id, state, uav_params, pload=False, lc=0):
+        self.id        = id
         self.m         = float(uav_params['m'])
         self.I         = np.diag(uav_params['I'])
         self.invI      = linalg.inv(self.I)
         self.d         = float(uav_params['d']) 
         self.cft       = float(uav_params['cft'])
-        self.maxThrust = 12 # [g] per motor
+        self.maxThrust = float(uav_params['mxTh']) # [g] per motor
         arm           = 0.707106781*self.d
         self.invAll = np.array([
             [0.25, -(0.25 / arm), -(0.25 / arm), -(0.25 / self.cft)],
@@ -423,7 +436,7 @@ class UavModel:
         motorForceG_clipped = np.clip(motorForceG, 0, self.maxThrust)
 
         motorForce = motorForceG_clipped*9.81/1000
-        mu, sigma = 0, 0.1
+        mu, sigma = 0, 0
         noise = np.random.normal(mu,sigma, 4)
         noise = np.zeros(4,)
         motorForce += noise
