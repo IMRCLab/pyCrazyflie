@@ -214,7 +214,7 @@ def animateTrajectory(uavs, payloads, videoname, shared):
     # Animation    
     fig     = plt.figure(figsize=(10,10))
     ax      = fig.add_subplot(autoscale_on=True,projection="3d")
-    sample  = 10
+    sample  = 100
     animate = animateSingleUav.PlotandAnimate(fig, ax, uavs, payloads, sample, shared) 
     dt_sampled = list(uavs.values())[0].dt * sample
     print("Starting Animation... \nAnimating, Please wait...")
@@ -273,6 +273,7 @@ def StatefromSharedPayload(id, payload, angState, lc, j):
         wl = payload.state[10:13] #wl of payload
         R0_dot = R0@uav.skew(wl)
         velq = payload.state[3:6] - lc * pdot + R0_dot @ posFrload
+        # print('posq: ', posq, 'velq: ', velq, 'posfrLoad', posFrload, 'qi', qi)
     uavState[0:3]  = posq
     uavState[3:6]  = velq
     uavState[6:10] = angState[0:4]
@@ -584,7 +585,8 @@ def main(args, animateOrPlotdict, params):
                         des_w, des_wd  = np.zeros(3,), np.zeros(3,)
                         ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)        
                 control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
-                # print(control_inp)
+                uavs[id].state = StatefromSharedPayload(id, payload, uavs[id].state[6::], uavs[id].lc, j)
+                # print(id, control_inp)
                 ctrlInputs  = np.vstack((ctrlInputs, control_inp.reshape(1,4)))
                 Re3 = rn.to_matrix(uavs[id].state[6:10])@np.array([0,0,1])
                 if payload.lead:
@@ -597,20 +599,17 @@ def main(args, animateOrPlotdict, params):
                     setpoints[id] = setpoint
                     sensors_[id]  = sensors
                     states[id]    = state
-                j+=3
                 uavs[id].stackStandCtrl(uavs[id].state, control_inp, ref_state)                   
+                j+=3
             payload.cursorUp() 
             # Evolve the payload states
-            uavs, loadState =  payload.stateEvolution(ctrlInputs, uavs, uavs_params)
+            uavs, loadState =  payload.stateEvolution(ctrlInputs, uavs, uavs_params)    
             if payload.lead:
                 payload.stackStateandRef(plref_state)
             else:
-                payload.stackState()
-            ## Evolve the states of the uav based on the Payload state
-            i = plStSize    
-            for id in uavs.keys():
-                uavs[id].state = StatefromSharedPayload(id, payload, uavs[id].state[6::], uavs[id].lc, i)
-                i +=3    
+                payload.stackState() 
+            # sys.exit()
+        
         for id in uavs.keys():
             uavs[id].cursorUp()
         payload.cursorPlUp()

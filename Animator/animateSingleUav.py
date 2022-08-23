@@ -405,7 +405,7 @@ class PlotandAnimate:
         # Initialize a 3d figure
         self.fig = fig
         self.ax  = ax
-        self.ax.view_init(25,35)
+        self.ax.view_init(30,-35)
         self.shared = shared
     def initializeQuad(self, uav):    
         # Create the lines and vectors to draw body and desired frames
@@ -416,8 +416,8 @@ class PlotandAnimate:
         self.vec1d = self.ax.quiver([],[],[],[],[],[])
         self.vec2d = self.ax.quiver([],[],[],[],[],[])
         self.vec3d = self.ax.quiver([],[],[],[],[],[])
-        self.armb1  = np.array([[self.uavModel.d*10**(0.40)*np.cos(0)], [self.uavModel.d*10**(0.40)*np.sin(0)] ,[0]])
-        self._armb1 = np.array([[-self.uavModel.d*10**(0.40)*np.cos(0)], [-self.uavModel.d*10**(0.40)*np.sin(0)] ,[0]])
+        self.armb1  = np.array([[self.uavModel.d*10**(0.350)*np.cos(0)], [self.uavModel.d*10**(0.350)*np.sin(0)] ,[0]])
+        self._armb1 = np.array([[-self.uavModel.d*10**(0.350)*np.cos(0)], [-self.uavModel.d*10**(0.350)*np.sin(0)] ,[0]])
         q90z        = rn.from_euler(0, 0, np.radians(90),convention='xyz')
         rot90z      = rn.to_matrix(q90z)
         self.armb2  = rot90z @ (self.armb1.reshape(3,))
@@ -564,12 +564,12 @@ class PlotandAnimate:
                 if self.shared:
                     if not self.payload.pointmass:
                         pos  = (xl[i], yl[i], zl[i])
-                        size = (0.2588, 0.4482, 0.1)
-                        self.plotCubeAt(pos, size)
+                        size = (0.4482, 0.2588, 0.1)
                         posFrload = self.payload.posFrloaddict[id]
-                        Rp = rn.to_matrix(self.payload.state[6:10])
+                        Rp = rn.to_matrix(self.plFullstate[i,6:10])
+                        self.plotCubeAt(pos, size, Rp)
                         posq  = np.array([x[i],y[i],z[i]])
-                        posp = np.array([xl[i], yl[i], zl[i]]) + Rp@posFrload
+                        posp = np.array([xl[i], yl[i], zl[i]]) + Rp@posFrload 
                         self.plotRigidPayloadCables(size, x[i], y[i], z[i], posp[0], posp[1], posp[2])
                     else:
                         self.drawPayload(x[i], y[i], z[i], xl[i], yl[i], zl[i])
@@ -589,29 +589,44 @@ class PlotandAnimate:
             self.drawActvsRefTraj(x, y, z, xref, yref, zref)
             self.drawQuadrotorArms(x[i], y[i], z[i], armI1, armI2, _armI1, _armI2)
 
-            Xb,Yb,Zb = RotatedCylinder(0,0,0.06,0.1,q) 
+            Xb,Yb,Zb = RotatedCylinder(0,0,0.04,0.05,q) 
             self.drawPropellers(Xb, Yb, Zb,armI1, armI2, _armI1, _armI2)
         
         return self.line, 
 
 
-    def cuboid_data(self,o, size=(1,1,1)):
+    def cuboid_data(self,o, size, Rp):
         l, w, h = size
         
-        x = [[o[0], o[0] + l, o[0] + l, o[0], o[0]],  
-            [o[0], o[0] + l, o[0] + l, o[0], o[0]],  
-            [o[0], o[0] + l, o[0] + l, o[0], o[0]],  
-            [o[0], o[0] + l, o[0] + l, o[0], o[0]]]  
+        # x = [[o[0], o[0] + l, o[0] + l, o[0], o[0]],  
+        #     [o[0], o[0] + l, o[0] + l, o[0], o[0]],  
+        #     [o[0], o[0] + l, o[0] + l, o[0], o[0]],  
+        #     [o[0], o[0] + l, o[0] + l, o[0], o[0]]]  
       
-        y = [[o[1], o[1], o[1] + w, o[1] + w, o[1]],  
-            [o[1], o[1], o[1] + w, o[1] + w, o[1]],  
-            [o[1], o[1], o[1], o[1], o[1]],          
-            [o[1] + w, o[1] + w, o[1] + w, o[1] + w, o[1] + w]]   
+        # y = [[o[1], o[1], o[1] + w, o[1] + w, o[1]],  
+        #     [o[1], o[1], o[1] + w, o[1] + w, o[1]],  
+        #     [o[1], o[1], o[1], o[1], o[1]],          
+        #     [o[1] + w, o[1] + w, o[1] + w, o[1] + w, o[1] + w]]   
 
-        z = [[o[2], o[2], o[2], o[2], o[2]],                       
-            [o[2] + h, o[2] + h, o[2] + h, o[2] + h, o[2] + h],   
-            [o[2], o[2], o[2] + h, o[2] + h, o[2]],               
-            [o[2], o[2], o[2] + h, o[2] + h, o[2]]]               
+        # z = [[o[2], o[2], o[2], o[2], o[2]],                       
+        #     [o[2] + h, o[2] + h, o[2] + h, o[2] + h, o[2] + h],   
+        #     [o[2], o[2], o[2] + h, o[2] + h, o[2]],               
+        #     [o[2], o[2], o[2] + h, o[2] + h, o[2]]]               
+
+        x = [[0, 0 + l, 0 + l, 0, 0],  
+            [0, 0 + l, 0 + l, 0, 0],  
+            [0, 0 + l, 0 + l, 0, 0],  
+            [0, 0 + l, 0 + l, 0, 0]]  
+      
+        y = [[0, 0, 0 + w, 0 + w, 0],  
+            [0, 0, 0 + w, 0 + w, 0],  
+            [0, 0, 0, 0, 0],          
+            [0 + w, 0 + w, 0 + w, 0 + w, 0 + w]]   
+
+        z = [[0, 0, 0, 0, 0],                       
+            [0 + h, 0 + h, 0 + h, 0 + h, 0 + h],   
+            [0, 0, 0 + h, 0 + h, 0],               
+            [0, 0, 0 + h, 0 + h, 0]]               
 
         row = len(x)
         column = len(x[0])
@@ -619,9 +634,15 @@ class PlotandAnimate:
             for j in range(column):
                 x[i][j] -=  l/2
                 y[i][j] -=  w/2
-                z[i][j] = z[i][j]
+                z[i][j] -= h
+                r = np.array([x[i][j],y[i][j],z[i][j]])
+                r_i = o + Rp @ r
+                x[i][j] =  r_i[0]
+                y[i][j] =  r_i[1]
+                z[i][j] =  r_i[2]
+
         return np.array(x), np.array(y), np.array(z)
 
-    def plotCubeAt(self, pos, size,**kwargs):
-        X, Y, Z = self.cuboid_data( pos, size )
+    def plotCubeAt(self, pos, size,Rp, **kwargs):
+        X, Y, Z = self.cuboid_data( pos, size, Rp)
         self.ax.plot_surface(X, Y, Z, rstride=1, cstride=1, color='grey', alpha=0.1,antialiased=False)
