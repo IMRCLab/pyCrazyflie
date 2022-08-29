@@ -92,7 +92,8 @@ class SharedPayload:
         self.cablegains = payload_params['payloadCtrl']['gains']['cable']
         self.ctrlType   = payload_params['payloadCtrl']['name']
         self.offset     = float(payload_params['payloadCtrl']['offset'])
-        self.optimize   = payload_params['payloadCtrl']['optimize']
+        self.optimize   = payload_params['payloadCtrl']['optimize']['mode']
+        self.qp_tool    = payload_params['payloadCtrl']['optimize']['qp']
         self.posFrload = np.empty((1,3))
         self.posFrloaddict = {}
 

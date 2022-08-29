@@ -4,7 +4,8 @@ from uavDy import uav
 from scipy import linalg as la
 import sys
 import cvxpy as cp
-
+import osqp 
+from scipy import sparse
 modeAbs     = 0
 modeDisable = 1
 modeVelocity = 2
@@ -240,7 +241,7 @@ def torqueCtrlwPayload(uavModel, fi, payload, setpoint, tick):
 def parallelComp(virtualInp, uavModel, payload, j):
     ## This only includes the point mass model
     grav = np.array([0,0,-9.81])
-    acc_ = payload.accl[0:3] #(payload.state[3:6] - payload.prevSt[3:6])/payload.dt
+    acc_ = np.zeros(3,) #payload.accl[0:3] #(payload.state[3:6] - payload.prevSt[3:6])/payload.dt
     acc0 = acc_ - grav
     m   = uavModel.m
     l = uavModel.lc
@@ -253,7 +254,7 @@ def parallelComp(virtualInp, uavModel, payload, j):
 def perpindicularComp(desVirtInp, uavModel, payload, kq, kw, ki, j, tick):
     ## This only includes the point mass model
     grav = np.array([0,0,-9.81])
-    acc_ = payload.accl[0:3] #(payload.state[3:6] - payload.prevSt[3:6])/payload.dt
+    acc_ = np.zeros(3,) #payload.accl[0:3] #(payload.state[3:6] - payload.prevSt[3:6])/payload.dt
     acc0 = acc_ - grav
     qdi    = - desVirtInp/ np.linalg.norm(desVirtInp)
     if tick == 0: 
@@ -365,7 +366,7 @@ def controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, t
             P[3::,i:i+3] = uav.skew(payload.posFrload[k,:]) 
             k+=1
     if payload.optimize:
-        desVirtInp = qpVBC(uavs, payload, Ud.reshape(rows,), P)
+        desVirtInp = qp(uavs, payload, Ud.reshape(rows,), P)
     else:
         P_inv = P.T @ np.linalg.inv(P@P.T)
         desVirtInp = (R_p_diag) @ (P_inv) @ (Ud.reshape(rows,))
@@ -387,16 +388,59 @@ def controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, t
 
     return control, des_w, des_wd
 
+def qlimit(uavs, payload, numofquads):
+    q_limit = np.empty((numofquads,3))
+    q1 = np.radians([-20 ,  0, 0]) 
+    q2 = np.radians([20, 0, 0])
 
-def qpVBC(uavs, payload, Ud, P):
+    q1 = rn.to_matrix(rn.from_euler(q1[0], q1[1], q1[2], convention='xyz',axis_type='extrinsic')) @ np.array([0,0,-1])
+    q2 = rn.to_matrix(rn.from_euler(q2[0], q2[1], q2[2], convention='xyz',axis_type='extrinsic')) @ np.array([0,0,-1])
+    # Rotate the vectors by 20 degrees
+    q_rotate = np.radians([0,0,20])
+    q_rotate = rn.from_euler(q_rotate[0], q_rotate[1], q_rotate[2],convention='xyz',axis_type='extrinsic')
+
+    q1_ = rn.rotate(q_rotate, q1)
+    q2_ = rn.rotate(q_rotate, q2)
+  
+    n1 = np.cross(q1, q1_)
+    n2 = np.cross(q2, q2_)
+
+    A = np.zeros((2,6))
+    A[0, 0:3] = n1
+    A[1, 3:6] = n2
+    return A
+
+def qp(uavs, payload, Ud, P_alloc):
     size = 3*payload.numOfquads
-    mu = cp.Variable((size,))
-   
-    Q = np.eye(size)
-    objective   = cp.Minimize((1/2)*cp.quad_form(mu, Q))
+    P = np.eye(size)
+  
+    Ain = qlimit(uavs, payload, payload.numOfquads)
+    if payload.qp_tool == 'cvxpy':
+        mu_des = cp.Variable((size,))
+        objective   = cp.Minimize((1/2)*cp.quad_form(mu_des, P))
+        constraints = [P_alloc@mu_des == Ud,
+                        Ain@mu_des <= np.zeros(2,)]
+        
+        prob = cp.Problem(objective, constraints)
+        data, chain, inverse_data = prob.get_problem_data(cp.OSQP)
+        print('data: ',data.keys())
+        for key in data.keys():
+            print(key, '\n', data[key],'\n')
+        prob.solve(verbose=True, solver='OSQP')
+        mu_des = mu_des.value 
  
-    constraints = [P@mu == Ud]
-    prob = cp.Problem(objective, constraints)
-    prob.solve()
-    mu = mu.value 
-    return mu
+    elif payload.qp_tool == 'osqp':
+        A     = sparse.vstack((P_alloc, Ain), format='csc') 
+        P     = sparse.csc_matrix(P)
+        q     = np.zeros(6)
+        l     = np.hstack([Ud, -np.inf*np.ones(2,)])
+        u     = np.hstack([Ud, np.zeros(2,)]) 
+        prob = osqp.OSQP()
+        # SAME SETTINGS AS CVXPY
+        # settings = {'eps_abs': 1.0e-5, 'eps_rel' : 1.0e-05,
+        #   'eps_prim_inf' : 1.0e-04, 'eps_dual_inf' : 1.0e-04,'rho' : 1.00e-01,
+        #   'sigma' : 1.00e-06, 'alpha' : 1.60 ,'max_iter': 1000, 
+        #   'verbose': False, 'linsys_solver': 'qdldl', 'check_termination': 25, 'polish': True}
+        prob.setup(P=P, q=q, A=A, l=l, u=u, verbose=False)
+        mu_des = prob.solve()
+    return mu_des.x
