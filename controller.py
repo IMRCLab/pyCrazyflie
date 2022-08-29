@@ -214,7 +214,7 @@ def animateTrajectory(uavs, payloads, videoname, shared):
     # Animation    
     fig     = plt.figure(figsize=(10,10))
     ax      = fig.add_subplot(autoscale_on=True,projection="3d")
-    sample  = 100
+    sample  = 250
     animate = animateSingleUav.PlotandAnimate(fig, ax, uavs, payloads, sample, shared) 
     dt_sampled = list(uavs.values())[0].dt * sample
     print("Starting Animation... \nAnimating, Please wait...")
@@ -563,7 +563,7 @@ def main(args, animateOrPlotdict, params):
                 if payload.lead:
                     ## Choose controller: Python or firmware
                     if payload.ctrlType == 'lee':
-                        control, des_w, des_wd = cffirmware.controllerLeePayload(uavs[id], payload, control, setpoint, sensors, state, tick, j)
+                        control, des_w, des_wd = cffirmware.controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, tick, j)
                         ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)
                     elif payload.ctrlType == 'lee_firmware':
                         leePayload.l = uavs[id].lc
@@ -586,7 +586,6 @@ def main(args, animateOrPlotdict, params):
                         ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)        
                 control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
                 uavs[id].state = StatefromSharedPayload(id, payload, uavs[id].state[6::], uavs[id].lc, j)
-                # print(id, control_inp)
                 ctrlInputs  = np.vstack((ctrlInputs, control_inp.reshape(1,4)))
                 Re3 = rn.to_matrix(uavs[id].state[6:10])@np.array([0,0,1])
                 if payload.lead:
