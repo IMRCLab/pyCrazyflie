@@ -571,6 +571,8 @@ def main(args, animateOrPlotdict, params):
                         if payload.optimize:
                             leePayload.value = id2value
                         cffirmware.controllerLeePayload(leePayload, control, setpoint, sensors, state, tick)
+                        ## to print the desVirtInp ##
+                        # print(Id, leePayload.desVirtInp)
                         des_w, des_wd  = np.zeros(3,), np.zeros(3,)
                         ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)
                 else:
