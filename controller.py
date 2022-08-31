@@ -537,7 +537,7 @@ def main(args, animateOrPlotdict, params):
                 ## If payload is not point mass, update its angular velocities
                 if not payload.pointmass:
                     sensors = updatePlsensors(sensors, payload) 
-                
+            id2value = 0;
             ## Update control for each UAV and states
             for id in uavs.keys():
                 if not payload.lead:
@@ -568,6 +568,8 @@ def main(args, animateOrPlotdict, params):
                     elif payload.ctrlType == 'lee_firmware':
                         leePayload.l = uavs[id].lc
                         leePayload.mass = uavs[id].m
+                        if payload.optimize:
+                            leePayload.value = id2value
                         cffirmware.controllerLeePayload(leePayload, control, setpoint, sensors, state, tick)
                         des_w, des_wd  = np.zeros(3,), np.zeros(3,)
                         ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)
@@ -600,6 +602,7 @@ def main(args, animateOrPlotdict, params):
                     states[id]    = state
                 uavs[id].stackStandCtrl(uavs[id].state, control_inp, ref_state)                   
                 j+=3
+                id2value += 1
             payload.cursorUp() 
             # Evolve the payload states
             uavs, loadState =  payload.stateEvolution(ctrlInputs, uavs, uavs_params)    
@@ -607,7 +610,7 @@ def main(args, animateOrPlotdict, params):
                 payload.stackStateandRef(plref_state)
             else:
                 payload.stackState() 
-            # sys.exit()
+            
         
         for id in uavs.keys():
             uavs[id].cursorUp()

@@ -108,7 +108,7 @@ RobotswithPayload:
     wl          : [0,   0,    0]
     refTrajPath: "trajectoriescsv/hover_01.csv" #linTraj_traj.csv #cirTraj1.csv
     payloadCtrl:
-      name: 'lee'
+      name: 'lee_firmware'
       payloadLead: 'enabled'
       optimize:
         mode: 'enabled'
@@ -119,10 +119,10 @@ RobotswithPayload:
           # Payload PID
           kpx  : 10.0 #18.0 #10.0 #10.0  
           kpy  : 10.0 #18.0 #10.0 #10.0
-          kpz  : 90.0 #18.0 #10.0 #10.0
+          kpz  : 10.0 #18.0 #10.0 #10.0
           kdx  :  8.0 #4.0 #16.0 #8.0 #8.0
           kdy  :  8.0 #4.0 #16.0 #8.0 #8.0
-          kdz  :  50.0 #4.0 #16.0 #8.0 #8.0
+          kdz  :  8.0 #4.0 #16.0 #8.0 #8.0
           kipx : 0.0
           kipy : 0.0
           kipz : 0.0
