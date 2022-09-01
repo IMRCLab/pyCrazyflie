@@ -214,7 +214,7 @@ def animateTrajectory(uavs, payloads, videoname, shared):
     # Animation    
     fig     = plt.figure(figsize=(10,10))
     ax      = fig.add_subplot(autoscale_on=True,projection="3d")
-    sample  = 250
+    sample  = 200
     animate = animateSingleUav.PlotandAnimate(fig, ax, uavs, payloads, sample, shared) 
     dt_sampled = list(uavs.values())[0].dt * sample
     print("Starting Animation... \nAnimating, Please wait...")
@@ -345,58 +345,68 @@ def setTeamParams(params, initUavs):
     return plStSize, uavs, uavs_params, payload, trajectories, pltrajectory
 
 
-def initPLController(payload):
+def initPLController(uavs, payload):
     """This function initializes the controller"""
+    states    = {} 
+    controls  = {}
+    sensors_  = {}
     if payload.ctrlType == 'lee':
         cffirmware.controllerLeePayloadInit() 
     elif payload.ctrlType == 'lee_firmware':
-        leePayload = cffirmware.controllerLeePayload_t()
-        cffirmware.controllerLeePayloadInit(leePayload)
-        leePayload.mp = payload.mp
-        leePayload.offset = payload.offset
-        leePayload.Kpos_P.x = payload.controller['kpx']
-        leePayload.Kpos_P.y = payload.controller['kpy']
-        leePayload.Kpos_P.z = payload.controller['kpz']
-        leePayload.Kpos_D.x = payload.controller['kdx']
-        leePayload.Kpos_D.y = payload.controller['kdy']
-        leePayload.Kpos_D.z = payload.controller['kdz']
-        leePayload.Kpos_I.x = payload.controller['kipx']
-        leePayload.Kpos_I.y = payload.controller['kipy']
-        leePayload.Kpos_I.z = payload.controller['kipz']
-       
-        leePayload.KR.x     = payload.controller['krx']
-        leePayload.KR.y     = payload.controller['kry']
-        leePayload.KR.z     = payload.controller['krz']
-        leePayload.Komega.x = payload.controller['kwx']
-        leePayload.Komega.y = payload.controller['kwy']
-        leePayload.Komega.z = payload.controller['kwz']
-        leePayload.KI.x     = payload.controller['kix']
-        leePayload.KI.y     = payload.controller['kiy']
-        leePayload.KI.z     = payload.controller['kiz']   
+        for id in uavs.keys():
+            leePayload = cffirmware.controllerLeePayload_t()
+            cffirmware.controllerLeePayloadInit(leePayload)
+            leePayload.mp = payload.mp
+            leePayload.offset = payload.offset
+            leePayload.Kpos_P.x = payload.controller['kpx']
+            leePayload.Kpos_P.y = payload.controller['kpy']
+            leePayload.Kpos_P.z = payload.controller['kpz']
+            leePayload.Kpos_D.x = payload.controller['kdx']
+            leePayload.Kpos_D.y = payload.controller['kdy']
+            leePayload.Kpos_D.z = payload.controller['kdz']
+            leePayload.Kpos_I.x = payload.controller['kipx']
+            leePayload.Kpos_I.y = payload.controller['kipy']
+            leePayload.Kpos_I.z = payload.controller['kipz']
+        
+            leePayload.KR.x     = payload.controller['krx']
+            leePayload.KR.y     = payload.controller['kry']
+            leePayload.KR.z     = payload.controller['krz']
+            leePayload.Komega.x = payload.controller['kwx']
+            leePayload.Komega.y = payload.controller['kwy']
+            leePayload.Komega.z = payload.controller['kwz']
+            leePayload.KI.x     = payload.controller['kix']
+            leePayload.KI.y     = payload.controller['kiy']
+            leePayload.KI.z     = payload.controller['kiz']   
 
-        leePayload.K_q.x    = payload.cablegains['kqx']
-        leePayload.K_q.y    = payload.cablegains['kqy']
-        leePayload.K_q.z    = payload.cablegains['kqz']
-        leePayload.K_w.x    = payload.cablegains['kwcx']
-        leePayload.K_w.y    = payload.cablegains['kwcy']
-        leePayload.K_w.z    = payload.cablegains['kwcz']
+            leePayload.K_q.x    = payload.cablegains['kqx']
+            leePayload.K_q.y    = payload.cablegains['kqy']
+            leePayload.K_q.z    = payload.cablegains['kqz']
+            leePayload.K_w.x    = payload.cablegains['kwcx']
+            leePayload.K_w.y    = payload.cablegains['kwcy']
+            leePayload.K_w.z    = payload.cablegains['kwcz']
+            control = cffirmware.control_t()
+            # allocate desired state
+            setpoint = cffirmware.setpoint_t()
+            setpoint = setTrajmode(setpoint)
+            sensors = cffirmware.sensorData_t()
+            state = cffirmware.state_t()
+            uavs[id].ctrlPayload = leePayload
+            states[id] = state
+            sensors_[id] = sensors
+            controls[id] = control
+        return uavs, controls, setpoint, sensors_, states
+    for id in uavs.keys():
+        cffirmware.controllerLeePayloadInit() 
         control = cffirmware.control_t()
         # allocate desired state
         setpoint = cffirmware.setpoint_t()
         setpoint = setTrajmode(setpoint)
         sensors = cffirmware.sensorData_t()
         state = cffirmware.state_t()
-        
-        return leePayload, control, setpoint, sensors, state
-
-    cffirmware.controllerLeePayloadInit() 
-    controls = cffirmware.control_t()
-    # allocate desired state
-    setpoint = cffirmware.setpoint_t()
-    setpoint = setTrajmode(setpoint)
-    sensors = cffirmware.sensorData_t()
-    state = cffirmware.state_t()
-    return controls, setpoint, sensors, state 
+        states[id] = state
+        sensors_[id] = sensors
+        controls[id] = control
+    return controls, setpoint, sensors_, states 
 
 def updatePlstate(state, payload):
     plstate = payload.state
@@ -505,9 +515,9 @@ def main(args, animateOrPlotdict, params):
     if shared:
         if payload.lead:
             if payload.ctrlType == 'lee_firmware':
-                leePayload, control, setpoint, sensors, state = initPLController(payload)
+                uavs, controls, setpoint, sensors_, states = initPLController(uavs, payload)
             elif payload.ctrlType == 'lee':
-                control, setpoint, sensors, state = initPLController(payload)
+                controls, setpoint, sensors_, states = initPLController(uavs, payload)
         else:
             controls, setpoints, sensors_, states, lees =  {}, {}, {}, {}, {} 
             for id in uavs.keys():
@@ -532,16 +542,14 @@ def main(args, animateOrPlotdict, params):
                 else: 
                     setpoint  = updatePlDesState(setpoint, payload, timeStamped_traj[1::,-1])
                     plref_state = np.array([setpoint.position.x, setpoint.position.y, setpoint.position.z, setpoint.velocity.x, setpoint.velocity.y, setpoint.velocity.z])
-                ## Update the state of the payload 
-                state   =  updatePlstate(state, payload)
-                ## If payload is not point mass, update its angular velocities
-                if not payload.pointmass:
-                    sensors = updatePlsensors(sensors, payload) 
             id2value = 0;
             ## Update control for each UAV and states
             for id in uavs.keys():
                 if not payload.lead:
                     control, setpoint, sensors, state = controls[id], setpoints[id], sensors_[id], states[id]
+                elif payload.lead: 
+                    control, sensors, state = controls[id], sensors_[id], states[id]
+                    
                 #initialize the controller and allocate current state (both sensor and state are the state)
                 # This is kind of odd and should be part of state
                 if tick <= int(tf_ms):
@@ -556,9 +564,14 @@ def main(args, animateOrPlotdict, params):
                         ref_state = np.array(timeStamped_traj[id][1:7,-1])
                     else:
                         ref_state =  uavs[id].state[0:6]
-                 # update current state
+                 # update current state              
+                 # update the state of the payload 
+                state   =  updatePlstate(state, payload)
                 state, fullState = updateState(state, uavs[id])
-                sensors          = updateSensor(sensors, uavs[id])
+                ## If payload is not point mass, update its angular velocities
+                sensors  = updateSensor(sensors, uavs[id])
+                if not payload.pointmass:
+                    sensors = updatePlsensors(sensors, payload) 
                 
                 if payload.lead:
                     ## Choose controller: Python or firmware
@@ -566,6 +579,7 @@ def main(args, animateOrPlotdict, params):
                         control, des_w, des_wd = cffirmware.controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, tick, j)
                         ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)
                     elif payload.ctrlType == 'lee_firmware':
+                        leePayload = uavs[id].ctrlPayload
                         leePayload.l = uavs[id].lc
                         leePayload.mass = uavs[id].m
                         if payload.optimize:
@@ -600,6 +614,10 @@ def main(args, animateOrPlotdict, params):
                 if not payload.lead:
                     controls[id]  = control
                     setpoints[id] = setpoint
+                    sensors_[id]  = sensors
+                    states[id]    = state
+                elif payload.lead:
+                    controls[id]  = control
                     sensors_[id]  = sensors
                     states[id]    = state
                 uavs[id].stackStandCtrl(uavs[id].state, control_inp, ref_state)                   
