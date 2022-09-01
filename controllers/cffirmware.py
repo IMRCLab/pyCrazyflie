@@ -335,7 +335,7 @@ def controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, t
     mp  = payload.mp 
     gravComp = np.array([0,0,9.81]).reshape((3,1))
 
-    Fd = mp * (- kp @ ep - kd @ ev + ki_p @ ei + desAcc + gravComp)
+    Fd = mp * (- kp @ ep - kd @ ev + desAcc + gravComp)
 
     qi = payload.state[j:j+3]
     wi = payload.state[j+3*payload.numOfquads:j+3+3*payload.numOfquads]
