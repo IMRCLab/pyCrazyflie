@@ -214,7 +214,7 @@ def animateTrajectory(uavs, payloads, videoname, shared):
     # Animation    
     fig     = plt.figure(figsize=(10,10))
     ax      = fig.add_subplot(autoscale_on=True,projection="3d")
-    sample  = 200
+    sample  = 100
     animate = animateSingleUav.PlotandAnimate(fig, ax, uavs, payloads, sample, shared) 
     dt_sampled = list(uavs.values())[0].dt * sample
     print("Starting Animation... \nAnimating, Please wait...")
@@ -357,7 +357,9 @@ def initPLController(uavs, payload):
             leePayload = cffirmware.controllerLeePayload_t()
             cffirmware.controllerLeePayloadInit(leePayload)
             leePayload.mp = payload.mp
-            leePayload.offset = payload.offset
+            leePayload.offsetx = payload.offset[0]
+            leePayload.offsety = payload.offset[1]
+            leePayload.offsetz = payload.offset[2]
             leePayload.Kpos_P.x = payload.controller['kpx']
             leePayload.Kpos_P.y = payload.controller['kpy']
             leePayload.Kpos_P.z = payload.controller['kpz']
@@ -509,6 +511,10 @@ def main(args, animateOrPlotdict, params):
     print('UAVs Initial States: [x y z xdot ydot zdot qw qx qy qz wx wy wz] \n')
     for key in uavs.keys():
         print(key, uavs[key].state)
+    if shared:
+        print() 
+        print('payload pos:',payload.state[0:3])
+
     print()
     print('Simulating...')
 
@@ -585,8 +591,6 @@ def main(args, animateOrPlotdict, params):
                         if payload.optimize:
                             leePayload.value = id2value
                         cffirmware.controllerLeePayload(leePayload, control, setpoint, sensors, state, tick)
-                        ## to print the desVirtInp ##
-                        # print(Id, leePayload.desVirtInp)
                         des_w, des_wd  = np.zeros(3,), np.zeros(3,)
                         ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)
                 else:

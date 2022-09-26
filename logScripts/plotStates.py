@@ -184,7 +184,7 @@ def main(args):
     posdes = np.column_stack((
     logData['ctrltargetZ.x'] / 1000.0,
     logData['ctrltargetZ.y'] / 1000.0,
-    logData['ctrltargetZ.z'] / 1000.0 - 0.57))
+    logData['ctrltargetZ.z'] / 1000.0))
 
     linVeldes = np.column_stack((
     logData['ctrltargetZ.vx'] / 1000.0,

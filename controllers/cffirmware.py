@@ -241,7 +241,7 @@ def torqueCtrlwPayload(uavModel, fi, payload, setpoint, tick):
 def parallelComp(virtualInp, uavModel, payload, j):
     ## This only includes the point mass model
     grav = np.array([0,0,-9.81])
-    acc_ = np.zeros(3,) #payload.accl[0:3] #(payload.state[3:6] - payload.prevSt[3:6])/payload.dt
+    acc_ = payload.accl[0:3] #(payload.state[3:6] - payload.prevSt[3:6])/payload.dt
     acc0 = acc_ - grav
     m   = uavModel.m
     l = uavModel.lc
@@ -254,7 +254,7 @@ def parallelComp(virtualInp, uavModel, payload, j):
 def perpindicularComp(desVirtInp, uavModel, payload, kq, kw, ki, j, tick):
     ## This only includes the point mass model
     grav = np.array([0,0,-9.81])
-    acc_ = np.zeros(3,) #payload.accl[0:3] #(payload.state[3:6] - payload.prevSt[3:6])/payload.dt
+    acc_ = payload.accl[0:3] #(payload.state[3:6] - payload.prevSt[3:6])/payload.dt
     acc0 = acc_ - grav
     qdi    = - desVirtInp/ np.linalg.norm(desVirtInp)
     if tick == 0: 
