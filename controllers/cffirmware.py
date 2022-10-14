@@ -345,7 +345,7 @@ def controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, t
     rows = 3
     Rdp = np.eye(3)
     wdp = np.zeros(3,)
-    Ud = Fd
+    Ud = Fd.copy()
 
     if not payload.pointmass: 
         Rp = rn.to_matrix(payload.state[6:10])
@@ -389,52 +389,71 @@ def controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, t
     return control, des_w, des_wd
 
 def qlimit(uavs, payload, numofquads):
-    q_limit = np.empty((numofquads,3))
-    q1 = np.radians([-20 ,  0, 0]) 
-    q2 = np.radians([20, 0, 0])
+    # q_limit = np.empty((numofquads,3))
+    # q1 = np.radians([-20 ,  0, 0]) 
+    # q2 = np.radians([20, 0, 0])
 
-    q1 = rn.to_matrix(rn.from_euler(q1[0], q1[1], q1[2], convention='xyz',axis_type='extrinsic')) @ np.array([0,0,-1])
-    q2 = rn.to_matrix(rn.from_euler(q2[0], q2[1], q2[2], convention='xyz',axis_type='extrinsic')) @ np.array([0,0,-1])
-    # Rotate the vectors by 20 degrees
-    q_rotate = np.radians([0,0,20])
-    q_rotate = rn.from_euler(q_rotate[0], q_rotate[1], q_rotate[2],convention='xyz',axis_type='extrinsic')
+    # q1 = rn.to_matrix(rn.from_euler(q1[0], q1[1], q1[2], convention='xyz',axis_type='extrinsic')) @ np.array([0,0,-1])
+    # q2 = rn.to_matrix(rn.from_euler(q2[0], q2[1], q2[2], convention='xyz',axis_type='extrinsic')) @ np.array([0,0,-1])
+    # # Rotate the vectors by 20 degrees
+    # q_rotate = np.radians([0,0,20])
+    # q_rotate = rn.from_euler(q_rotate[0], q_rotate[1], q_rotate[2],convention='xyz',axis_type='extrinsic')
 
-    q1_ = rn.rotate(q_rotate, q1)
-    q2_ = rn.rotate(q_rotate, q2)
+    # q1_ = rn.rotate(q_rotate, q1)
+    # q2_ = rn.rotate(q_rotate, q2)
   
-    n1 = np.cross(q1, q1_)
-    n2 = np.cross(q2, q2_)
+    # n1 = np.cross(q1, q1_)
+    # n2 = np.cross(q2, q2_)
 
-    A = np.zeros((2,6))
-    A[0, 0:3] = n1
-    A[1, 3:6] = n2
+    # A = np.zeros((2,6))
+    # A[0, 0:3] = n1
+    # A[1, 3:6] = n2
+    n_stack = np.empty((1,3))
+    for id in uavs.keys():
+        hrpy = np.radians(uavs[id].hyperrpy)
+        hyaw = np.radians(uavs[id].hyperyaw)     
+        for i in range(len(hrpy)):
+            hrpyi = hrpy[i]
+            x = np.array([np.cos(hyaw[i][0]), np.sin(hyaw[i][0]), 0]).reshape(3,)
+            z = rn.to_matrix(rn.from_euler(hrpyi[0], hrpyi[1], hrpyi[2], convention='xyz', axis_type='extrinsic')) @np.array([0,0,1])
+            normZX = np.linalg.norm(np.cross(z, x))
+            ni = ((np.cross(x, z))/(normZX))
+            n_stack = np.vstack((n_stack, ni.reshape(1,3)))
+    n_stack = np.delete(n_stack,  0, 0)
+    hplanesNums = n_stack.shape[0]
+    A = np.zeros((hplanesNums, 3*numofquads))
+    j, k = 0, 0
+    for id in uavs.keys():
+        for i in range(len(uavs[id].hyperrpy)):
+            A[k, j:j+3] = n_stack[k,:]
+            k+=1 
+        j+=3
     return A
 
 def qp(uavs, payload, Ud, P_alloc):
     size = 3*payload.numOfquads
     P = np.eye(size)
-  
     Ain = qlimit(uavs, payload, payload.numOfquads)
     if payload.qp_tool == 'cvxpy':
         mu_des = cp.Variable((size,))
         objective   = cp.Minimize((1/2)*cp.quad_form(mu_des, P))
         constraints = [P_alloc@mu_des == Ud,
-                        Ain@mu_des <= np.zeros(2,)]
+                        Ain@mu_des <= np.zeros(Ain.shape[0],)]
         
         prob = cp.Problem(objective, constraints)
         data, chain, inverse_data = prob.get_problem_data(cp.OSQP)
-        print('data: ',data.keys())
-        for key in data.keys():
-            print(key, '\n', data[key],'\n')
-        prob.solve(verbose=True, solver='OSQP')
+        # print('data: ',data.keys())
+        # for key in data.keys():
+        #     print(key, '\n', data[key],'\n')
+        prob.solve(verbose=False, solver='OSQP')
         mu_des = mu_des.value 
  
     elif payload.qp_tool == 'osqp':
         A     = sparse.vstack((P_alloc, Ain), format='csc') 
         P     = sparse.csc_matrix(P)
-        q     = np.zeros(6)
-        l     = np.hstack([Ud, -np.inf*np.ones(2,)])
-        u     = np.hstack([Ud, np.zeros(2,)]) 
+        q     = np.zeros(size)
+        l     = np.hstack([Ud, -np.inf*np.ones(Ain.shape[0],)])
+        u     = np.hstack([Ud, np.zeros(Ain.shape[0],)]) 
         prob = osqp.OSQP()
         # SAME SETTINGS AS CVXPY
         # settings = {'eps_abs': 1.0e-5, 'eps_rel' : 1.0e-05,
@@ -443,4 +462,8 @@ def qp(uavs, payload, Ud, P_alloc):
         #   'verbose': False, 'linsys_solver': 'qdldl', 'check_termination': 25, 'polish': True}
         prob.setup(P=P, q=q, A=A, l=l, u=u, verbose=False)
         mu_des = prob.solve()
-    return mu_des.x
+        mu_des = mu_des.x
+    else:
+        print('Please choose either cvxpy framework or osqp solver in the mode of the payloadCtrl')
+        sys.exit()
+    return mu_des

@@ -329,6 +329,9 @@ def setTeamParams(params, initUavs):
             w_i    = robot['initConditions']['init_angVel_Q']
             angSt  = np.hstack((quat, w_i)).reshape((7,))
             uav1   = uav.UavModel(dt, 'uav_'+name, StatefromSharedPayload('uav_'+name, payload, angSt, lc, j), robot, pload=True, lc=lc)
+            if payload.optimize:
+                uav1.hyperrpy = robot['hyperplanes']['rpy']
+                uav1.hyperyaw = robot['hyperplanes']['yaw']
             j +=3
             uavs['uav_'+name] = uav1    
     else:
@@ -581,10 +584,10 @@ def main(args, animateOrPlotdict, params):
                 
                 if payload.lead:
                     ## Choose controller: Python or firmware
-                    if payload.ctrlType == 'lee':
+                    if payload.ctrlType == 'lee': # Python
                         control, des_w, des_wd = cffirmware.controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, tick, j)
                         ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)
-                    elif payload.ctrlType == 'lee_firmware':
+                    elif payload.ctrlType == 'lee_firmware': # Firmware
                         leePayload = uavs[id].ctrlPayload
                         leePayload.l = uavs[id].lc
                         leePayload.mass = uavs[id].m

@@ -367,7 +367,9 @@ class UavModel:
         self.dt    = dt
         self.a     = np.zeros(3,)
         self.controller = uav_params['controller']
-        self.ctrlPayload = 0;
+        self.ctrlPayload = 0
+        self.hyperrpy = np.zeros(3,)
+        self.hyperyaw = 0 
         self.fullState = np.empty((1,16))
         self.ctrlInps  = np.empty((1,8))
         self.refState  = np.empty((1,12))
