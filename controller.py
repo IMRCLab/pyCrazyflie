@@ -471,7 +471,16 @@ def updatePlDesState(setpoint, payload, fulltraj):
         setpoint.attitude.pitch = 0
         setpoint.attitude.roll = 0
     return setpoint
-
+def setPlanes(leePayload, rpyplanes4robots, yaw4robots):
+    leePayload.rpyPlane1.x = rpyplanes4robots[0][0]
+    leePayload.rpyPlane1.y = rpyplanes4robots[0][1]
+    leePayload.rpyPlane1.z = rpyplanes4robots[0][2]
+    leePayload.rpyPlane2.x = rpyplanes4robots[1][0]
+    leePayload.rpyPlane2.y = rpyplanes4robots[1][1]
+    leePayload.rpyPlane2.z = rpyplanes4robots[1][2]
+    leePayload.yawPlane1   = yaw4robots[0][0]
+    leePayload.yawPlane2   = yaw4robots[1][0]
+    return leePayload
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##        
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##
 def main(args, animateOrPlotdict, params):
@@ -525,6 +534,13 @@ def main(args, animateOrPlotdict, params):
         if payload.lead:
             if payload.ctrlType == 'lee_firmware':
                 uavs, controls, setpoint, sensors_, states = initPLController(uavs, payload)
+                # prepare hyperplanes in a list for all UAVs to use them
+                if payload.optimize:         
+                    rpyplanes4robots = []
+                    yaw4robots = []
+                    for id in uavs.keys():
+                        rpyplanes4robots.append(list(np.radians(uavs[id].hyperrpy[0])))
+                        yaw4robots.append(list(np.radians(uavs[id].hyperyaw[0])))
             elif payload.ctrlType == 'lee':
                 controls, setpoint, sensors_, states = initPLController(uavs, payload)
         else:
@@ -593,6 +609,7 @@ def main(args, animateOrPlotdict, params):
                         leePayload.mass = uavs[id].m
                         if payload.optimize:
                             leePayload.value = id2value
+                            leePayload = setPlanes(leePayload, rpyplanes4robots, yaw4robots)
                         cffirmware.controllerLeePayload(leePayload, control, setpoint, sensors, state, tick)
                         des_w, des_wd  = np.zeros(3,), np.zeros(3,)
                         ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)

@@ -406,7 +406,7 @@ class PlotandAnimate:
         self.fig = fig
         self.ax  = ax
         self.ax.view_init(30,-35)
-        self.ax.view_init(azim=0,elev=0)
+        # self.ax.view_init(azim=0,elev=0)
         self.shared = shared
     def initializeQuad(self, uav):    
         # Create the lines and vectors to draw body and desired frames
@@ -497,9 +497,9 @@ class PlotandAnimate:
 
     def drawActvsRefTraj(self, x, y, z, xref, yref, zref):
             # self.ax.plot3D(x, y, z, 'k-.',lw=1.5,label="Actual Trajectory")
-            # self.ax.plot3D(xref, yref ,zref,c='darkgreen',ls='--',lw=1.5,label="Reference Trajectory")
-            # # self.ax.legend()
-            pass
+            self.ax.plot3D(xref, yref ,zref,c='darkgreen',ls='--',lw=1.5,label="Reference Trajectory")
+            # self.ax.legend()
+
     def drawQuadrotorArms(self, x, y, z, armI1, armI2, _armI1, _armI2):
         self.ax.plot3D(np.linspace(x, armI1[0]), np.linspace(y, armI1[1]), np.linspace(z, armI1[2]),'k',lw=2)
         self.ax.plot3D(np.linspace(x, _armI1[0]), np.linspace(y, _armI1[1]), np.linspace(z, _armI1[2]),'k',lw=2)
