@@ -472,14 +472,30 @@ def updatePlDesState(setpoint, payload, fulltraj):
         setpoint.attitude.roll = 0
     return setpoint
 def setPlanes(leePayload, rpyplanes4robots, yaw4robots):
-    leePayload.rpyPlane1.x = rpyplanes4robots[0][0]
-    leePayload.rpyPlane1.y = rpyplanes4robots[0][1]
-    leePayload.rpyPlane1.z = rpyplanes4robots[0][2]
-    leePayload.rpyPlane2.x = rpyplanes4robots[1][0]
-    leePayload.rpyPlane2.y = rpyplanes4robots[1][1]
-    leePayload.rpyPlane2.z = rpyplanes4robots[1][2]
-    leePayload.yawPlane1   = yaw4robots[0][0]
-    leePayload.yawPlane2   = yaw4robots[1][0]
+    leePayload.rpyPlane11.x = rpyplanes4robots[0][0][0]
+    leePayload.rpyPlane11.y = rpyplanes4robots[0][0][1]
+    leePayload.rpyPlane11.z = rpyplanes4robots[0][0][2]
+    leePayload.rpyPlane12.x = rpyplanes4robots[0][1][0]
+    leePayload.rpyPlane12.y = rpyplanes4robots[0][1][1]
+    leePayload.rpyPlane12.z = rpyplanes4robots[0][1][2]
+    leePayload.rpyPlane21.x = rpyplanes4robots[1][0][0]
+    leePayload.rpyPlane21.y = rpyplanes4robots[1][0][1]
+    leePayload.rpyPlane21.z = rpyplanes4robots[1][0][2]
+    leePayload.rpyPlane22.x = rpyplanes4robots[1][1][0]
+    leePayload.rpyPlane22.y = rpyplanes4robots[1][1][1]
+    leePayload.rpyPlane22.z = rpyplanes4robots[1][1][2]
+    leePayload.rpyPlane31.x = rpyplanes4robots[2][0][0]
+    leePayload.rpyPlane31.y = rpyplanes4robots[2][0][1]
+    leePayload.rpyPlane31.z = rpyplanes4robots[2][0][2]
+    leePayload.rpyPlane32.x = rpyplanes4robots[2][1][0]
+    leePayload.rpyPlane32.y = rpyplanes4robots[2][1][1]
+    leePayload.rpyPlane32.z = rpyplanes4robots[2][1][2]
+    leePayload.yawPlane11   = yaw4robots[0][0][0]
+    leePayload.yawPlane12   = yaw4robots[0][1][0]
+    leePayload.yawPlane21   = yaw4robots[1][0][0]
+    leePayload.yawPlane22   = yaw4robots[1][1][0]
+    leePayload.yawPlane31   = yaw4robots[2][0][0]
+    leePayload.yawPlane32   = yaw4robots[2][1][0]
     return leePayload
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##        
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##
@@ -539,8 +555,8 @@ def main(args, animateOrPlotdict, params):
                     rpyplanes4robots = []
                     yaw4robots = []
                     for id in uavs.keys():
-                        rpyplanes4robots.append(list(np.radians(uavs[id].hyperrpy[0])))
-                        yaw4robots.append(list(np.radians(uavs[id].hyperyaw[0])))
+                        rpyplanes4robots.append((np.radians(uavs[id].hyperrpy)).tolist())
+                        yaw4robots.append((np.radians(uavs[id].hyperyaw)).tolist())    
             elif payload.ctrlType == 'lee':
                 controls, setpoint, sensors_, states = initPLController(uavs, payload)
         else:
