@@ -214,7 +214,7 @@ def animateTrajectory(uavs, payloads, videoname, shared):
     # Animation    
     fig     = plt.figure(figsize=(10,10))
     ax      = fig.add_subplot(autoscale_on=True,projection="3d")
-    sample  = 100
+    sample  = 200
     animate = animateSingleUav.PlotandAnimate(fig, ax, uavs, payloads, sample, shared) 
     dt_sampled = list(uavs.values())[0].dt * sample
     print("Starting Animation... \nAnimating, Please wait...")
@@ -555,8 +555,8 @@ def main(args, animateOrPlotdict, params):
                     rpyplanes4robots = []
                     yaw4robots = []
                     for id in uavs.keys():
-                        rpyplanes4robots.append((np.radians(uavs[id].hyperrpy)).tolist())
-                        yaw4robots.append((np.radians(uavs[id].hyperyaw)).tolist())    
+                        rpyplanes4robots.append(uavs[id].hyperrpy)
+                        yaw4robots.append(uavs[id].hyperyaw)    
             elif payload.ctrlType == 'lee':
                 controls, setpoint, sensors_, states = initPLController(uavs, payload)
         else:
