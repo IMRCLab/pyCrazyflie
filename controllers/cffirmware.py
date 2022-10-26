@@ -295,7 +295,7 @@ def controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, t
     kdy      = float(payload.controller['kdy'])
     kdz      = float(payload.controller['kdz'])
     kd = np.diag(np.array([kdx, kdy, kdz]))
-    kipx    = float(payload.controller['kipz'])
+    kipx    = float(payload.controller['kipx'])
     kipy    = float(payload.controller['kipy'])
     kipz    = float(payload.controller['kipz'])
     ki_p = np.diag(np.array([kipx, kipy, kipz]))
