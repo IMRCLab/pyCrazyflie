@@ -134,14 +134,20 @@ class SharedPayload:
         self.plref_state = np.empty((1,6))
         self.state, self.prevSt = self.getInitState(uavs_params, payload_params)
         self.accl   = np.zeros(self.sys_dim,)
+        self.accl[2] = -self.mp*9.81 
+        self.accl_prev = self.accl
         self.i_error = np.zeros(3,)
         self.qdi_prev = np.array([0,0,-1])
         self.wdi_prev = np.array([0,0,0])
+        self.mu_des_prev = np.zeros(3*self.numOfquads,)
         
     def getInitState(self, uav_params, payload_params):
         self.state = np.zeros(self.state_size,)
         self.state[0:3]   = payload_params['init_pos_L']
-        self.state[3:6]   = payload_params['init_linV_L']
+        self.accl   = np.zeros(self.sys_dim,)
+        self.accl[2] = -self.mp*9.81 
+        self.state[3:6]   = self.accl[0:3]*self.dt + payload_params['init_linV_L']
+        self.state[0:3]   = self.state[3:6]*self.dt + payload_params['init_pos_L']
         if not self.pointmass:
             init_ang     = np.radians(payload_params['init_angle']) 
             self.state[6:10]  = from_euler(init_ang[0], init_ang[1], init_ang[2])
@@ -297,8 +303,13 @@ class SharedPayload:
             self.plstate[0,k+3*self.numOfquads:k+3+3*self.numOfquads] = self.state[k+3*self.numOfquads:k+3+3*self.numOfquads]
             k+=3
             j+=3
-
-        self.accl = np.linalg.inv(Bq)@(Nq + u_inp)
+        try:
+            self.accl = np.linalg.inv(Bq)@(Nq + u_inp)
+            self.accl_prev = self.accl
+        except Exception as err:
+            print(f"Unexpected {err=}, {type(err)=}")
+            self.accl = self.accl_prev
+            raise
         self.prevSt = self.state.copy()
         self.getNextState()
         self.ctrlInp = np.array(np.empty((1,3)))
@@ -376,7 +387,9 @@ class UavModel:
         self.drag  = float((uav_params['drag']))
         if self.drag ==  1:
             self.Kaero = np.diag([-9.1785e-7, -9.1785e-7, -10.311e-7]) 
-            
+        # for collision avoidance
+        self.hp_stack = np.empty((1,4))
+        self.hp_prev = np.zeros(4,)
     def __str__(self):
         return "\nUAV object with physical parameters defined as follows: \n \n m = {} kg, l_arm = {} m \n \n{} {}\n I = {}{} [kg.m^2] \n {}{}\n\n Initial State = {}".format(self.m,self.d,'     ',self.I[0,:],' ',self.I[1,:],'     ',self.I[2,:], self.state)
         
@@ -498,4 +511,9 @@ class UavModel:
         fa   = wSum * self.Kaero @ np.transpose(R_IB) @ self.state[3:6]
         return fa
 
-   
+    def addHp(self,hp):
+        coeffs = hp.coeffs()
+        self.hp_stack =  np.vstack((self.hp_stack, coeffs))
+        self.hp_prev = coeffs
+    def removeEmptyRow(self):
+        self.hp_stack = np.delete(self.hp_stack, 0,0)
