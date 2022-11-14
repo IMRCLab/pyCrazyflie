@@ -6,9 +6,12 @@ import sys
 import cvxpy as cp
 import osqp 
 from scipy import sparse
+from itertools import permutations, combinations, chain
 modeAbs     = 0
 modeDisable = 1
 modeVelocity = 2
+np.set_printoptions(linewidth=np.inf)
+np.set_printoptions(suppress=True)
 
 class vec3_s:
     def __init__(self):
@@ -90,6 +93,25 @@ class state_t:
         self.acc = vec3_s()
         self.payload_pos = vec3_s()
         self.payload_vel = vec3_s()
+
+class hyperplane:
+    def __str__(self):
+      return  "normal: {}{}{}, offset:{} ".format(self.n[0], self.n[1], self.n[2], self.a)
+    def __init__(self, n, a):
+        self.n = n
+        self.a = a
+    def coeffs(self):
+        return np.array([self.n[0], self.n[1], self.n[2], self.a])
+
+class boundingBox:
+    def __init__(self, p, dx, dy, dz):
+        dx_v = np.array([dx, 0, 0]) # distance x from center
+        dy_v = np.array([0, dy, 0]) # distance y from center
+        dz_v = np.array([0, 0, dz]) # distance z from center
+        self.cornerPoints = np.array([p+dx_v+dy_v+dz_v, p-dx_v+dy_v+dz_v, 
+                p+dx_v-dy_v+dz_v, p-dx_v-dy_v+dz_v, p+dx_v+dy_v-dz_v,
+                p-dx_v+dy_v-dz_v, p+dx_v-dy_v-dz_v, p-dx_v-dy_v-dz_v])
+
 
 def controllerLeeInit():
     pass
@@ -285,6 +307,131 @@ def perpindicularComp(desVirtInp, uavModel, payload, kq, kw, ki, j, tick):
     u_perp = m * l  * uav.skew(qi) @ (-kq @ eq - kw @ ew- np.dot(qi, wdi)*qidot - skewqi2@wdidot) - m * skewqi2 @ acc0 
     return u_perp
 
+def normVec(n):
+    normn = np.linalg.norm(n)
+    if normn > 0:
+        return n / np.linalg.norm(n)
+    
+    raise ValueError('norm of the vector is zero!')
+    
+def qlimit(uavs, payload, numofquads, tick):
+    ids = list(uavs.keys())
+    pairsinIds = list(permutations(ids, 2))
+    n_stack = np.empty((1,3))
+    a_s = []
+    j = 0
+    for pair in pairsinIds:   
+        try:
+            constraints = []
+            pload = payload.state[0:3]
+            pos1 = uavs[pair[0]].state[0:3] 
+            pos2 = uavs[pair[1]].state[0:3] 
+            n = cp.Variable(3,)
+            a = cp.Variable()
+            Q = np.eye(3)
+            r = 0.1
+            objective = cp.Minimize(cp.quad_form(n, Q))
+            constraints.append([n.T@(pos1) - a <=  -1])
+            constraints.append([n.T@(pos2) - a >=   1])
+            constraints.append([n.T@pload  - a  ==  0])
+            rpoint = pos1 + ((pos2-pos1)/2) - r*normVec((pos2-pos1))
+            pdiff = rpoint - pos1
+            print(pair, pdiff, pos1, rpoint)
+            constraints.append([n.T@(pos1 + ((pos2-pos1)/2) - r*normVec((pos2-pos1)/2)) - a == 0])
+
+            constraints = list(chain.from_iterable(constraints))        
+            prob = cp.Problem(objective, constraints)
+            prob.solve(verbose=False, polish=True)            
+            n_sol =  (n.value)           
+            norm_n = np.linalg.norm(n_sol)
+            if norm_n > 0:
+                a_sol =  (np.array([a.value])[0])/norm_n
+            else:
+                raise ValueError('The norm of the vector is zero!')
+            n_sol = normVec(n_sol)
+            uavs[pair[0]].hp_prev[0:3] = n_sol
+            uavs[pair[0]].hp_prev[3] = a_sol
+            hp = hyperplane(n_sol, a_sol)
+            n_stack = np.vstack((n_stack, n_sol.reshape(1,3)))
+            a_s.append(a_sol)
+            uavs[pair[0]].addHp(hp)
+        except Exception as err:
+            print(f"Unexpected {err=}, {type(err)=}")
+            print('pair: ', pair)
+            print('hp.normal: ',uavs[pair[0]].hp_prev[0:3], ' a:', uavs[pair[0]].hp_prev[3])
+            print('hp.normal: ',uavs[pair[1]].hp_prev[0:3], ' a:', uavs[pair[1]].hp_prev[3])
+            n_prev = uavs[pair[0]].hp_prev[0:3]
+            a_prev = uavs[pair[0]].hp_prev[3]
+            hp_prev = hyperplane(n_prev, a_prev)
+            n_stack = np.vstack((n_stack, n_prev.reshape(1,3)))
+            dist = pload.T@n_prev
+            a_s.append(a_prev)
+            uavs[pair[0]].addHp(hp_prev)
+            raise
+            break
+
+    n_stack = np.delete(n_stack,  0, 0)
+    hplanesNums = len(pairsinIds)
+    A = np.zeros((hplanesNums, 3*numofquads))
+    j, k = 0, 0    
+    for id in uavs.keys():
+        for i in range((numofquads-1)):
+            A[k, j:j+3] = n_stack[k,:]
+            k+=1 
+        j+=3
+        # print('pair:', pair, '\n',
+        # 'nvec: ', n, '\n',
+        # 'offset: ', hp.a)
+    return uavs, A, a_s
+
+def qp(uavs, payload, Ud, P_alloc, tick):
+    size = 3*payload.numOfquads
+    P = np.eye(size)
+    uavs, Ain, a_s = qlimit(uavs, payload, payload.numOfquads, tick)
+    try:
+        if payload.qp_tool == 'cvxpy':
+            mu_des = cp.Variable((size,))
+            objective   = cp.Minimize((1/2)*cp.quad_form(mu_des, P))
+            constraints = [P_alloc@mu_des == Ud,
+                            Ain@mu_des + a_s <= np.zeros(Ain.shape[0]),]
+
+            prob = cp.Problem(objective, constraints)
+            # data, chain, inverse_data = prob.get_problem_data(cp.OSQP)
+            # print('data: ',data.keys())
+            # for key in data.keys():
+            #     print(key, '\n', data[key],'\n')
+            prob.solve(verbose=False, solver='OSQP')
+            mu_des = mu_des.value 
+
+        elif payload.qp_tool == 'osqp':
+            A     = sparse.vstack((P_alloc, sparse.csc_matrix(Ain)), format='csc') 
+            P     = sparse.csc_matrix(P)
+            q     = np.zeros(size)
+            l     = np.hstack([Ud, -np.inf*np.ones(Ain.shape[0],)])
+            u     = np.hstack([Ud, np.negative(a_s)])
+            prob = osqp.OSQP()
+            # SAME SETTINGS AS CVXPY
+            # settings = {'eps_abs': 1.0e-5, 'eps_rel' : 1.0e-05,
+            #   'eps_prim_inf' : 1.0e-04, 'eps_dual_inf' : 1.0e-04,'rho' : 1.00e-01,
+            #   'sigma' : 1.00e-06, 'alpha' : 1.60 ,'max_iter': 1000, 
+            #   'verbose': False, 'linsys_solver': 'qdldl', 'check_termination': 25, 'polish': True}
+            prob.setup(P=P, q=q, A=A, l=l, u=u, verbose=False)
+            mu_des = prob.solve()
+            mu_des = mu_des.x
+        else:
+            print('Please choose either cvxpy framework or osqp solver in the mode of the payloadCtrl')
+            sys.exit()
+        payload.mu_des_prev = mu_des
+        return uavs, payload, mu_des
+
+    except Exception as err:
+        print(f"Unexpected {err=}, {type(err)=}")
+        print('mu_des: ', payload.mu_des_prev, '\n')
+        mu_des = payload.mu_des_prev
+        raise
+        return uavs, payload, mu_des
+        
+
 def controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, tick, j):
     uavModel = uavs[id]
     kpx      = float(payload.controller['kpx'])
@@ -327,7 +474,6 @@ def controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, t
     desAcc  = np.array([setpoint.acceleration.x, setpoint.acceleration.y, setpoint.acceleration.z]).reshape((3,1))
     desjerk = np.array([setpoint.jerk.x, setpoint.jerk.y, setpoint.jerk.z]).reshape((3,))
     dessnap = np.array([setpoint.snap.x, setpoint.snap.y, setpoint.snap.z]).reshape((3,))
-    
     ep = (currPos - desPos)
     ev = (currVl  - desVl)
     payload.i_error = payload.i_error.reshape((3,1)) + payload.dt * ep
@@ -366,7 +512,7 @@ def controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, t
             P[3::,i:i+3] = uav.skew(payload.posFrload[k,:]) 
             k+=1
     if payload.optimize:
-        desVirtInp = qp(uavs, payload, Ud.reshape(rows,), P)
+        uavs, payload, desVirtInp = qp(uavs, payload, Ud.reshape(rows,), P, tick)
     else:
         P_inv = P.T @ np.linalg.inv(P@P.T)
         desVirtInp = (R_p_diag) @ (P_inv) @ (Ud.reshape(rows,))
@@ -386,84 +532,4 @@ def controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, t
     torquesTick, des_w, des_wd = torqueCtrlwPayload(uavModel, control.u_all, payload, setpoint, tick*1e-3)
     control.torque = np.array([torquesTick[0], torquesTick[1], torquesTick[2]])
 
-    return control, des_w, des_wd
-
-def qlimit(uavs, payload, numofquads):
-    # q_limit = np.empty((numofquads,3))
-    # q1 = np.radians([-20 ,  0, 0]) 
-    # q2 = np.radians([20, 0, 0])
-
-    # q1 = rn.to_matrix(rn.from_euler(q1[0], q1[1], q1[2], convention='xyz',axis_type='extrinsic')) @ np.array([0,0,-1])
-    # q2 = rn.to_matrix(rn.from_euler(q2[0], q2[1], q2[2], convention='xyz',axis_type='extrinsic')) @ np.array([0,0,-1])
-    # # Rotate the vectors by 20 degrees
-    # q_rotate = np.radians([0,0,20])
-    # q_rotate = rn.from_euler(q_rotate[0], q_rotate[1], q_rotate[2],convention='xyz',axis_type='extrinsic')
-
-    # q1_ = rn.rotate(q_rotate, q1)
-    # q2_ = rn.rotate(q_rotate, q2)
-  
-    # n1 = np.cross(q1, q1_)
-    # n2 = np.cross(q2, q2_)
-
-    # A = np.zeros((2,6))
-    # A[0, 0:3] = n1
-    # A[1, 3:6] = n2
-    n_stack = np.empty((1,3))
-    for id in uavs.keys():
-        hrpy = np.radians(uavs[id].hyperrpy)
-        hyaw = np.radians(uavs[id].hyperyaw)     
-        for i in range(len(hrpy)):
-            hrpyi = hrpy[i]
-            x = np.array([np.cos(hyaw[i][0]), np.sin(hyaw[i][0]), 0]).reshape(3,)
-            z = rn.to_matrix(rn.from_euler(hrpyi[0], hrpyi[1], hrpyi[2], convention='xyz', axis_type='extrinsic')) @np.array([0,0,1])
-            normZX = np.linalg.norm(np.cross(z, x))
-            ni = ((np.cross(x, z))/(normZX))
-            n_stack = np.vstack((n_stack, ni.reshape(1,3)))
-    n_stack = np.delete(n_stack,  0, 0)
-    hplanesNums = n_stack.shape[0]
-    A = np.zeros((hplanesNums, 3*numofquads))
-    j, k = 0, 0
-    for id in uavs.keys():
-        for i in range(len(uavs[id].hyperrpy)):
-            A[k, j:j+3] = n_stack[k,:]
-            k+=1 
-        j+=3
-    return A
-
-def qp(uavs, payload, Ud, P_alloc):
-    size = 3*payload.numOfquads
-    P = np.eye(size)
-    Ain = qlimit(uavs, payload, payload.numOfquads)
-    if payload.qp_tool == 'cvxpy':
-        mu_des = cp.Variable((size,))
-        objective   = cp.Minimize((1/2)*cp.quad_form(mu_des, P))
-        constraints = [P_alloc@mu_des == Ud,
-                        Ain@mu_des <= np.zeros(Ain.shape[0],)]
-        
-        prob = cp.Problem(objective, constraints)
-        data, chain, inverse_data = prob.get_problem_data(cp.OSQP)
-        # print('data: ',data.keys())
-        # for key in data.keys():
-        #     print(key, '\n', data[key],'\n')
-        prob.solve(verbose=False, solver='OSQP')
-        mu_des = mu_des.value 
- 
-    elif payload.qp_tool == 'osqp':
-        A     = sparse.vstack((P_alloc, Ain), format='csc') 
-        P     = sparse.csc_matrix(P)
-        q     = np.zeros(size)
-        l     = np.hstack([Ud, -np.inf*np.ones(Ain.shape[0],)])
-        u     = np.hstack([Ud, np.zeros(Ain.shape[0],)]) 
-        prob = osqp.OSQP()
-        # SAME SETTINGS AS CVXPY
-        # settings = {'eps_abs': 1.0e-5, 'eps_rel' : 1.0e-05,
-        #   'eps_prim_inf' : 1.0e-04, 'eps_dual_inf' : 1.0e-04,'rho' : 1.00e-01,
-        #   'sigma' : 1.00e-06, 'alpha' : 1.60 ,'max_iter': 1000, 
-        #   'verbose': False, 'linsys_solver': 'qdldl', 'check_termination': 25, 'polish': True}
-        prob.setup(P=P, q=q, A=A, l=l, u=u, verbose=False)
-        mu_des = prob.solve()
-        mu_des = mu_des.x
-    else:
-        print('Please choose either cvxpy framework or osqp solver in the mode of the payloadCtrl')
-        sys.exit()
-    return mu_des
+    return uavs, payload, control, des_w, des_wd
