@@ -669,6 +669,7 @@ def main(args, animateOrPlotdict, params):
                     uavs[id].stackStandCtrl(uavs[id].state, control_inp, ref_state)                   
                     j+=3
                     id2value += 1
+                payload.stackmuDes(payload.mu_des_prev)
                 payload.cursorUp() 
                 # Evolve the payload states
                 uavs, loadState =  payload.stateEvolution(ctrlInputs, uavs, uavs_params)    
@@ -683,9 +684,13 @@ def main(args, animateOrPlotdict, params):
             uavs[id].cursorUp()
             uavs[id].removeEmptyRow()
         payload.cursorPlUp()
+        payload.removemu()
         ## Animate or plot based on flags
         with open("../visualization-examples/payload.csv", "w") as f:
             np.savetxt(f, payload.plFullState, delimiter=",")
+
+        with open("../visualization-examples/mu.csv", "w") as f:
+            np.savetxt(f, payload.mu_des_stack, delimiter=",")
             
         for id in uavs.keys():
             with open("../visualization-examples/" + id + ".csv", "w") as f:

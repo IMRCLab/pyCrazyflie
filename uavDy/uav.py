@@ -140,7 +140,8 @@ class SharedPayload:
         self.qdi_prev = np.array([0,0,-1])
         self.wdi_prev = np.array([0,0,0])
         self.mu_des_prev = np.zeros(3*self.numOfquads,)
-        
+        self.mu_des_stack = np.empty(3*self.numOfquads,)
+
     def getInitState(self, uav_params, payload_params):
         self.state = np.zeros(self.state_size,)
         self.state[0:3]   = payload_params['init_pos_L']
@@ -324,6 +325,9 @@ class SharedPayload:
             uavs[id].state[10::] = wNext
             m+=1
         return uavs, self.state 
+    
+    def stackmuDes(self, mu_des):
+        self.mu_des_stack = np.vstack((self.mu_des_stack, mu_des))
 
     def stackCtrl(self, ctrlInp):  
        self.ctrlInp = np.vstack((self.ctrlInp,ctrlInp))
@@ -335,6 +339,9 @@ class SharedPayload:
         self.plFullState = np.vstack((self.plFullState, self.plstate)) 
         self.plref_state = np.vstack((self.plref_state, plref_state.reshape((1,6)))) 
 
+    def removemu(self):
+        self.mu_des_stack = np.delete(self.mu_des_stack, 0, 0)
+         
     def cursorPlUp(self):
         self.plFullState = np.delete(self.plFullState, 0, 0)
         self.plref_state = np.delete(self.plref_state, 0, 0)
@@ -515,5 +522,6 @@ class UavModel:
         coeffs = hp.coeffs()
         self.hp_stack =  np.vstack((self.hp_stack, coeffs))
         self.hp_prev = coeffs
+
     def removeEmptyRow(self):
         self.hp_stack = np.delete(self.hp_stack, 0,0)

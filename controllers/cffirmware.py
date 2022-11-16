@@ -96,7 +96,7 @@ class state_t:
 
 class hyperplane:
     def __str__(self):
-      return  "normal: {}{}{}, offset:{} ".format(self.n[0], self.n[1], self.n[2], self.a)
+      return  "normal: [{}, {}, {}], offset: {} ".format(np.around(self.n[0], decimals=5), np.around(self.n[1], decimals=5), np.around(self.n[2], decimals=5), np.around(self.a, decimals=5))
     def __init__(self, n, a):
         self.n = n
         self.a = a
@@ -310,7 +310,7 @@ def perpindicularComp(desVirtInp, uavModel, payload, kq, kw, ki, j, tick):
 def normVec(n):
     normn = np.linalg.norm(n)
     if normn > 0:
-        return n / np.linalg.norm(n)
+        return n / normn
     
     raise ValueError('norm of the vector is zero!')
     
@@ -326,35 +326,23 @@ def qlimit(uavs, payload, numofquads, tick):
             pload = payload.state[0:3]
             pos1 = uavs[pair[0]].state[0:3] 
             pos2 = uavs[pair[1]].state[0:3] 
-            n = cp.Variable(3,)
-            a = cp.Variable()
-            Q = np.eye(3)
             r = 0.1
-            objective = cp.Minimize(cp.quad_form(n, Q))
-            constraints.append([n.T@(pos1) - a <=  -1])
-            constraints.append([n.T@(pos2) - a >=   1])
-            constraints.append([n.T@pload  - a  ==  0])
-            rpoint = pos1 + ((pos2-pos1)/2) - r*normVec((pos2-pos1))
-            pdiff = rpoint - pos1
-            print(pair, pdiff, pos1, rpoint)
-            constraints.append([n.T@(pos1 + ((pos2-pos1)/2) - r*normVec((pos2-pos1)/2)) - a == 0])
+            pr = pos1 + ((pos2-pos1)/2) + r*normVec((pos1-pos2))
 
-            constraints = list(chain.from_iterable(constraints))        
-            prob = cp.Problem(objective, constraints)
-            prob.solve(verbose=False, polish=True)            
-            n_sol =  (n.value)           
-            norm_n = np.linalg.norm(n_sol)
-            if norm_n > 0:
-                a_sol =  (np.array([a.value])[0])/norm_n
-            else:
-                raise ValueError('The norm of the vector is zero!')
-            n_sol = normVec(n_sol)
+            p0pr = pr - pload
+            prp2 = pos2 - pr
+
+            ns = np.cross(prp2, p0pr)           
+            n_sol = np.cross(p0pr, ns)   
+            a_sol = n_sol.dot(pload)
             uavs[pair[0]].hp_prev[0:3] = n_sol
-            uavs[pair[0]].hp_prev[3] = a_sol
+            uavs[pair[0]].hp_prev[3]   = a_sol
+           
             hp = hyperplane(n_sol, a_sol)
             n_stack = np.vstack((n_stack, n_sol.reshape(1,3)))
             a_s.append(a_sol)
             uavs[pair[0]].addHp(hp)
+        
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")
             print('pair: ', pair)
@@ -519,7 +507,8 @@ def controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, t
     if not payload.pointmass:
         desVirtInp = desVirtInp[j-6-7:j-3-7]
     else:   
-        desVirtInp = desVirtInp[j-6:j-3]    
+        desVirtInp = desVirtInp[j-6:j-3]
+
     qiqiT = qi.reshape((3,1))@(qi.T).reshape((1,3))
     virtualInp =  qiqiT @ desVirtInp  
     u_parallel = parallelComp(virtualInp, uavModel, payload, j)
