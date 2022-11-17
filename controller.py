@@ -8,9 +8,19 @@ from trajectoriescsv import *
 import time
 import argparse
 import sys
+from itertools import permutations, combinations, chain
 
 np.set_printoptions(linewidth=np.inf)
 np.set_printoptions(suppress=True)
+
+class hyperplane:
+    def __str__(self):
+      return  "normal: [{}, {}, {}], offset: {} ".format(np.around(self.n[0], decimals=5), np.around(self.n[1], decimals=5), np.around(self.n[2], decimals=5), np.around(self.a, decimals=5))
+    def __init__(self, n, a):
+        self.n = n
+        self.a = a
+    def coeffs(self):
+        return np.array([self.n[0], self.n[1], self.n[2], self.a])
 
 def initController(controller):
     """This function initializes the controller"""
@@ -110,9 +120,10 @@ def updateSensor(sensors, uav):
     sensors.gyro.z = np.degrees(uavState[12]) # deg/s
     return sensors
 
-def updateState(state, uav):
+def updateState(pair, state, uavs):
     """This function passes the current states to the controller"""
-    uavState = uav.state
+    uavState = uavs[pair[0]].state
+    uavState2 = uavs[pair[1]].state
     state.position.x = uavState[0]   # m
     state.position.y = uavState[1]    # m
     state.position.z = uavState[2]    # m
@@ -128,6 +139,9 @@ def updateState(state, uav):
     state.attitudeQuaternion.x = q_curr[1]
     state.attitudeQuaternion.y = q_curr[2]
     state.attitudeQuaternion.z = q_curr[3]
+    state.position2.x = uavState2[0]
+    state.position2.y = uavState2[1]
+    state.position2.z = uavState2[2]
     fullState = np.array([state.position.x,state.position.y,state.position.z, 
                           state.velocity.x,state.velocity.y, state.velocity.z, 
                           q_curr[0],q_curr[1],q_curr[2],q_curr[3], uavState[10],uavState[11],uavState[12]]).reshape((13,))
@@ -549,6 +563,8 @@ def main(args, animateOrPlotdict, params):
         if payload.lead:
             if payload.ctrlType == 'lee_firmware':
                 uavs, controls, setpoint, sensors_, states = initPLController(uavs, payload)
+                ids = list(uavs.keys())
+                pairsinIds = list(permutations(ids, 2))
                 # prepare hyperplanes in a list for all UAVs to use them
                 if payload.optimize:         
                     rpyplanes4robots = []
@@ -558,6 +574,9 @@ def main(args, animateOrPlotdict, params):
                         yaw4robots.append(uavs[id].hyperyaw)    
             elif payload.ctrlType == 'lee':
                 controls, setpoint, sensors_, states = initPLController(uavs, payload)
+                ids = list(uavs.keys())
+                pairsinIds = list(permutations(ids, 2))
+
         else:
             controls, setpoints, sensors_, states, lees =  {}, {}, {}, {}, {} 
             for id in uavs.keys():
@@ -585,7 +604,7 @@ def main(args, animateOrPlotdict, params):
             id2value = 0
             try:
                 ## Update states and  control input for each UAV 
-                for id in uavs.keys():
+                for pair, id in zip(pairsinIds, uavs.keys()):
                     if not payload.lead:
                         control, setpoint, sensors, state = controls[id], setpoints[id], sensors_[id], states[id]
                     elif payload.lead: 
@@ -608,12 +627,12 @@ def main(args, animateOrPlotdict, params):
                     # update current state              
                     # update the state of the payload 
                     state   =  updatePlstate(state, payload)
-                    state, fullState = updateState(state, uavs[id])
+                    state, fullState = updateState(pair, state, uavs)
                     ## If payload is not point mass, update its angular velocities
                     sensors  = updateSensor(sensors, uavs[id])
                     if not payload.pointmass:
                         sensors = updatePlsensors(sensors, payload) 
-                    
+
                     if payload.lead:
                         ## Choose controller: Python or firmware
                         if payload.ctrlType == 'lee': # Python
@@ -631,8 +650,23 @@ def main(args, animateOrPlotdict, params):
                             leePayload.mass = uavs[id].m
                             if payload.optimize:
                                 leePayload.value = id2value
-                                leePayload = setPlanes(leePayload, rpyplanes4robots, yaw4robots)
-                            cffirmware.controllerLeePayload(leePayload, control, setpoint, sensors, state, tick)
+                            try:
+                                cffirmware.controllerLeePayload(leePayload, control, setpoint, sensors, state, tick)
+                            except Exception as err:
+                                print(f"Controller failed, Unexpected {err=}, {type(err)=}")
+                                raise
+                                break
+                            payload.mu_des_prev = np.array([leePayload.mu1.x, leePayload.mu1.y, leePayload.
+                            mu1.z, leePayload.mu2.x, leePayload.mu2.y, leePayload.mu2.z]) 
+                            n_sol1 = np.array([leePayload.n1.x, leePayload.n1.y, leePayload.n1.z])
+                            a_sol1 = 0
+                            hp1 = hyperplane(n_sol1, a_sol1)
+                            uavs[pair[0]].addHp(hp1)
+                            # n_sol2 = np.array([leePayload.n2.x, leePayload.n2.y, leePayload.n2.z])
+                            # a_sol2 = 0
+                            # hp2 = hyperplane(n_sol2, a_sol2)
+                            # uavs[pair[1]].addHp(hp2)
+
                             des_w, des_wd  = np.zeros(3,), np.zeros(3,)
                             ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)
                     else:
@@ -676,10 +710,12 @@ def main(args, animateOrPlotdict, params):
                 if payload.lead:
                     payload.stackStateandRef(plref_state)
                 else:
-                    payload.stackState() 
+                    payload.stackState()     
+            except Exception as err:
+                    print(f"Failure in {err=}, {type(err)=}")
+                    raise
+                    break
                 
-            except:
-                break
         for id in uavs.keys():
             uavs[id].cursorUp()
             uavs[id].removeEmptyRow()

@@ -87,6 +87,7 @@ class control_t:
 class state_t:
     def __init__(self):
         self.position = vec3_s()
+        self.position2 = vec3_s()
         self.attitude = attitude_t()
         self. attitudeQuaternion = quaternion_t()
         self.velocity = vec3_s()
@@ -328,13 +329,13 @@ def qlimit(uavs, payload, numofquads, tick):
             pos2 = uavs[pair[1]].state[0:3] 
             r = 0.1
             pr = pos1 + ((pos2-pos1)/2) + r*normVec((pos1-pos2))
-
             p0pr = pr - pload
             prp2 = pos2 - pr
-
+           
             ns = np.cross(prp2, p0pr)           
-            n_sol = np.cross(p0pr, ns)   
-            a_sol = n_sol.dot(pload)
+            n_sol = np.cross(p0pr, ns)
+
+            a_sol = 0
             uavs[pair[0]].hp_prev[0:3] = n_sol
             uavs[pair[0]].hp_prev[3]   = a_sol
            
@@ -381,7 +382,7 @@ def qp(uavs, payload, Ud, P_alloc, tick):
             mu_des = cp.Variable((size,))
             objective   = cp.Minimize((1/2)*cp.quad_form(mu_des, P))
             constraints = [P_alloc@mu_des == Ud,
-                            Ain@mu_des + a_s <= np.zeros(Ain.shape[0]),]
+                            Ain@mu_des - a_s <= np.zeros(Ain.shape[0])]
 
             prob = cp.Problem(objective, constraints)
             # data, chain, inverse_data = prob.get_problem_data(cp.OSQP)
@@ -390,13 +391,12 @@ def qp(uavs, payload, Ud, P_alloc, tick):
             #     print(key, '\n', data[key],'\n')
             prob.solve(verbose=False, solver='OSQP')
             mu_des = mu_des.value 
-
         elif payload.qp_tool == 'osqp':
             A     = sparse.vstack((P_alloc, sparse.csc_matrix(Ain)), format='csc') 
             P     = sparse.csc_matrix(P)
             q     = np.zeros(size)
             l     = np.hstack([Ud, -np.inf*np.ones(Ain.shape[0],)])
-            u     = np.hstack([Ud, np.negative(a_s)])
+            u     = np.hstack([Ud, a_s])
             prob = osqp.OSQP()
             # SAME SETTINGS AS CVXPY
             # settings = {'eps_abs': 1.0e-5, 'eps_rel' : 1.0e-05,

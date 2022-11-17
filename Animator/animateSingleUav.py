@@ -558,7 +558,7 @@ class PlotandAnimate:
                     self.payload = self.payloads 
                 if self.payload.lead:
                     self.reference_state = self.payload.plref_state[::self.sample, :]
-                    hps = self.uavModel.hps
+                    hps = self.uavModel.hp_stack
                 else:
                     if self.shared: 
                         self.payload     = self.payloads
