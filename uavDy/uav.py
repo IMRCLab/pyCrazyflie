@@ -13,6 +13,22 @@ def skew(w):
     w3 = w[2,0]
     return np.array([[0, -w3, w2],[w3, 0, -w1],[-w2, w1, 0]]).reshape((3,3))
 
+class environment:
+    def __init__(self, Kp, Kd, pd):
+        self.Kp = Kp
+        self.Kd = Kd
+        self.pd = pd
+        self.vd = np.zeros(3,)
+
+    def interactionForce(self, p, v):
+        F = np.zeros(3,)
+        if p[2] <= self.pd[2]:
+            self.pd[0:2] = p[0:2]
+            ep = self.pd - p
+            ed = self.vd - v
+            F =  self.Kp@ep + self.Kd@ed 
+            # F = np.clip(F, np.array([-1,-1, -1]), np.array([1, 1, 1]))
+        return F
 
 class Payload:
     def __init__(self, dt, state, params):
@@ -145,7 +161,7 @@ class SharedPayload:
         self.state = np.zeros(self.state_size,)
         self.state[0:3]   = payload_params['init_pos_L']
         self.accl   = np.zeros(self.sys_dim,)
-        self.accl[2] = -self.mp*9.81 
+        self.accl[2] = 0 #-self.mp*9.81 
         self.state[3:6]   = self.accl[0:3]*self.dt + payload_params['init_linV_L']
         self.state[0:3]   = self.state[3:6]*self.dt + payload_params['init_pos_L']
         if not self.pointmass:
@@ -287,7 +303,7 @@ class SharedPayload:
             k+=3
             j+=3
 
-    def stateEvolution(self, ctrlInputs, uavs, uavs_params):
+    def stateEvolution(self, ctrlInputs, uavs, uavs_params, ext_f):
         ctrlInputs = np.delete(ctrlInputs, 0,0)
         Bq    = self.getBq(uavs_params)
         Nq    = self.getNq(uavs_params)
@@ -304,7 +320,9 @@ class SharedPayload:
             k+=3
             j+=3
         try:
-            self.accl = np.linalg.inv(Bq)@(Nq + u_inp)
+            ext_f_ = np.zeros_like(u_inp)
+            ext_f_[0:3] = ext_f
+            self.accl = np.linalg.inv(Bq)@(Nq + u_inp + ext_f_)
             self.accl_prev = self.accl
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")

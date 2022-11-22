@@ -588,6 +588,10 @@ def main(args, animateOrPlotdict, params):
                 uavs, controls, setpoint, sensors_, states = initPLController(uavs, payload)
                 ids = list(uavs.keys())
                 pairsinIds = list(permutations(ids, 2))
+                Kp    = np.diag([1000,1000,1000])
+                Kd    = np.diag([10,10,10])
+                floor = uav.environment(Kp, Kd, np.array([0,0, 0]))
+                
                 # prepare hyperplanes in a list for all UAVs to use them
                 if payload.optimize:         
                     rpyplanes4robots = []
@@ -596,6 +600,9 @@ def main(args, animateOrPlotdict, params):
                         rpyplanes4robots.append(uavs[id].hyperrpy)
                         yaw4robots.append(uavs[id].hyperyaw)    
             elif payload.ctrlType == 'lee':
+                Kp    = np.diag([100,100,100])
+                Kd    = np.diag([10,10,10])
+                floor = uav.environment(Kp, Kd, np.array([0,0, 0]))
                 controls, setpoint, sensors_, states = initPLController(uavs, payload)
                 ids = list(uavs.keys())
                 pairsinIds = list(permutations(ids, 2))
@@ -729,7 +736,7 @@ def main(args, animateOrPlotdict, params):
                 payload.stackmuDes(payload.mu_des_prev)
                 payload.cursorUp() 
                 # Evolve the payload states
-                uavs, loadState =  payload.stateEvolution(ctrlInputs, uavs, uavs_params)    
+                uavs, loadState =  payload.stateEvolution(ctrlInputs, uavs, uavs_params, floor.interactionForce(payload.state[0:3], payload.state[3:6]))    
                 if payload.lead:
                     payload.stackStateandRef(plref_state)
                 else:
