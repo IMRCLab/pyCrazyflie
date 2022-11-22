@@ -120,8 +120,8 @@ def updateSensor(sensors, uav):
     sensors.gyro.z = np.degrees(uavState[12]) # deg/s
     return sensors
 
-def updateState(pair, state, uavs):
-    """This function passes the current states to the controller"""
+def updateStateForPairs(pair, state, uavs):
+    """This function passes the current states for pairs to the controller"""
     uavState = uavs[pair[0]].state
     uavState2 = uavs[pair[1]].state
     state.position.x = uavState[0]   # m
@@ -142,6 +142,29 @@ def updateState(pair, state, uavs):
     state.position2.x = uavState2[0]
     state.position2.y = uavState2[1]
     state.position2.z = uavState2[2]
+    fullState = np.array([state.position.x,state.position.y,state.position.z, 
+                          state.velocity.x,state.velocity.y, state.velocity.z, 
+                          q_curr[0],q_curr[1],q_curr[2],q_curr[3], uavState[10],uavState[11],uavState[12]]).reshape((13,))
+    return state, fullState
+
+def updateState(state, uav):
+    """This function passes the current states to the controller"""
+    uavState = uav.state
+    state.position.x = uavState[0]   # m
+    state.position.y = uavState[1]    # m
+    state.position.z = uavState[2]    # m
+    state.velocity.x = uavState[3]    # m/s
+    state.velocity.y = uavState[4]    # m/s
+    state.velocity.z = uavState[5]    # m/s
+    q_curr = np.array(uavState[6:10]).reshape((4,))
+    rpy_state  = rn.to_euler(q_curr,convention='xyz')
+    state.attitude.roll  = np.degrees(rpy_state[0])
+    state.attitude.pitch = np.degrees(-rpy_state[1])
+    state.attitude.yaw   = np.degrees(rpy_state[2])
+    state.attitudeQuaternion.w = q_curr[0]
+    state.attitudeQuaternion.x = q_curr[1]
+    state.attitudeQuaternion.y = q_curr[2]
+    state.attitudeQuaternion.z = q_curr[3]
     fullState = np.array([state.position.x,state.position.y,state.position.z, 
                           state.velocity.x,state.velocity.y, state.velocity.z, 
                           q_curr[0],q_curr[1],q_curr[2],q_curr[3], uavState[10],uavState[11],uavState[12]]).reshape((13,))
@@ -627,7 +650,7 @@ def main(args, animateOrPlotdict, params):
                     # update current state              
                     # update the state of the payload 
                     state   =  updatePlstate(state, payload)
-                    state, fullState = updateState(pair, state, uavs)
+                    state, fullState = updateStateForPairs(pair, state, uavs)
                     ## If payload is not point mass, update its angular velocities
                     sensors  = updateSensor(sensors, uavs[id])
                     if not payload.pointmass:
@@ -662,10 +685,10 @@ def main(args, animateOrPlotdict, params):
                             a_sol1 = 0
                             hp1 = hyperplane(n_sol1, a_sol1)
                             uavs[pair[0]].addHp(hp1)
-                            # n_sol2 = np.array([leePayload.n2.x, leePayload.n2.y, leePayload.n2.z])
-                            # a_sol2 = 0
-                            # hp2 = hyperplane(n_sol2, a_sol2)
-                            # uavs[pair[1]].addHp(hp2)
+                            n_sol2 = np.array([leePayload.n2.x, leePayload.n2.y, leePayload.n2.z])
+                            a_sol2 = 0
+                            hp2 = hyperplane(n_sol2, a_sol2)
+                            uavs[pair[1]].addHp(hp2)
 
                             des_w, des_wd  = np.zeros(3,), np.zeros(3,)
                             ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)
@@ -748,8 +771,8 @@ def main(args, animateOrPlotdict, params):
             # note that the attitude controller will only compute a new output at 500 Hz
             # and the position controller only at 100 Hz
             # If you want an output always, simply select tick==0
-            if uavs[id].pload:
-                payload = payloads[id]
+            # if uavs[id].pload:
+            #     payload = payload[id]
             
             for tick in range(0, int(tf_sim)+1):
                 # update desired state
@@ -777,16 +800,16 @@ def main(args, animateOrPlotdict, params):
                     ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)             
                 control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
                 if uavs[id].pload:
-                    uavs[id] = payloads[id].PL_nextState(control_inp, uavs[id])
+                    payload[id].PL_nextState(control_inp, uavs[id])
                 else:
                     uavs[id].states_evolution(control_inp)  # states evolution
                 uavs[id].stackStandCtrl(uavs[id].state, control_inp, ref_state)    
             uavs[id].cursorUp()
             if uavs[id].pload:
-                payloads[id].cursorUp()
+                payload[id].cursorUp()
                 
         # Animation        
-        animateOrPlot(uavs, payloads, animateOrPlotdict, filename, tf_sim, shared, sample)    
+        animateOrPlot(uavs, payload, animateOrPlotdict, filename, tf_sim, shared, sample)    
 
 
 if __name__ == '__main__':

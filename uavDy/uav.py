@@ -34,7 +34,7 @@ class Payload:
         pd    = np.cross(curr_wl, curr_p)
         u     = fz * R_IB * np.array([0,0,1]) 
         self.al    =  (1/self.mt) * (self.grav_ + (np.vdot(curr_p, R_IB @ np.array([0,0,fz])) - (self.m * self.lc * (np.vdot(pd, pd)))) * curr_p)
-        Vl_   = al * self.dt + curr_vl
+        Vl_   = self.al * self.dt + curr_vl
         posl_ = curr_vl * self.dt + curr_posl
         return posl_, Vl_
 
@@ -62,7 +62,7 @@ class Payload:
         wNext = uav.state[10::]
 
         poslNext, VlNext  = self.getPL_nextpos(fz, curr_posl, curr_vl, curr_p, curr_wl, curr_q)
- 
+        pNext, wlNext     = self.getPLAngularState(fz, curr_q, curr_p, curr_wl) 
         self.state[0:3]   = poslNext   # position: x,y,z
         self.state[3:6]   = VlNext  # linear velocity: xdot, ydot, zdot
         self.state[6:9]   = pNext # directional unit vector
@@ -70,7 +70,6 @@ class Payload:
         self.state[12:16] = qNext # Quadrotor attitude [q = qw, qx, qy, qz]
         self.state[16::]  = wNext # Quadrotor angular velocity [w = wx, wy, wz]
         self.plFullState  = np.vstack((self.plFullState, self.state))
-        return uav, self.state
 
     def cursorUp(self):
         ## This method removes the first row of the stack which is initialized as an empty array
