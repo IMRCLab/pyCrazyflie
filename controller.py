@@ -588,10 +588,9 @@ def main(args, animateOrPlotdict, params):
                 uavs, controls, setpoint, sensors_, states = initPLController(uavs, payload)
                 ids = list(uavs.keys())
                 pairsinIds = list(permutations(ids, 2))
-                Kp    = np.diag([1000,1000,1000])
-                Kd    = np.diag([10,10,10])
-                floor = uav.environment(Kp, Kd, np.array([0,0, 0]))
-                
+                Kp    = np.diag([100,100,100])
+                Kd    = np.diag([5,5,5])
+                floor = uav.environment(Kp, Kd, np.array([0, 0, 0]))
                 # prepare hyperplanes in a list for all UAVs to use them
                 if payload.optimize:         
                     rpyplanes4robots = []
@@ -600,9 +599,10 @@ def main(args, animateOrPlotdict, params):
                         rpyplanes4robots.append(uavs[id].hyperrpy)
                         yaw4robots.append(uavs[id].hyperyaw)    
             elif payload.ctrlType == 'lee':
-                Kp    = np.diag([100,100,100])
-                Kd    = np.diag([10,10,10])
-                floor = uav.environment(Kp, Kd, np.array([0,0, 0]))
+                # print('zebb')
+                Kp    = np.diag([0,0,0])
+                Kd    = np.diag([0,0,0])
+                floor = uav.environment(Kp, Kd, np.array([0, 0, 0]))
                 controls, setpoint, sensors_, states = initPLController(uavs, payload)
                 ids = list(uavs.keys())
                 pairsinIds = list(permutations(ids, 2))

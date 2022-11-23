@@ -7,6 +7,8 @@ import cvxpy as cp
 import osqp 
 from scipy import sparse
 from itertools import permutations, combinations, chain
+import time
+
 modeAbs     = 0
 modeDisable = 1
 modeVelocity = 2
@@ -327,6 +329,45 @@ def qlimit(uavs, payload, numofquads, tick):
             pload = payload.state[0:3]
             pos1 = uavs[pair[0]].state[0:3] 
             pos2 = uavs[pair[1]].state[0:3] 
+            l1 = uavs[pair[0]].lc
+            l2 = uavs[pair[1]].lc
+            # angle between pos1 and pos2
+            if payload.downwashAware:
+                if l1 <= l2:
+                    pos1_ = pos1
+                    pos2_ = pos2 
+                else:
+                    pos1_ = pos2
+                    pos2_ = pos1
+                pos1_r = pos1_ - pload  #pos1 relative to payload
+                pos2_r = pos2_ - pload  #pos2 relative to payload
+                p1_dot_p2 = pos1_r.dot(pos2_r)
+                normPos1  = np.linalg.norm(pos1_r)
+                normPos2  = np.linalg.norm(pos2_r)
+
+                angle_12      = np.arccos((p1_dot_p2/(normPos1*normPos2)))
+                pos1_r_proj   = np.array([pos1_r[0], pos1_r[1], 0])
+                normp1_r_proj = np.linalg.norm(pos1_r_proj)
+                if normp1_r_proj  > 0:
+                    angle_1   = np.arccos(pos1_r.dot(pos1_r_proj)/(normPos1*normp1_r_proj))
+
+                else:
+                    angle_1 = np.pi/2
+                angle_2   = np.pi - (angle_12 + angle_1)            
+                normpos2_r_new   = np.linalg.norm(pos1_r)*(np.sin(angle_1) /  np.sin(angle_2))
+                pos2_new    = pload + normpos2_r_new * normVec(pos2_r)
+
+                pos1 = uavs[pair[0]].state[0:3]
+                pos2 = uavs[pair[1]].state[0:3]
+                if l2 >= l1:
+                    pos2 = pos2_new
+                else: 
+                    pos1 = pos2_new
+            else:
+                pos1 = uavs[pair[0]].state[0:3] 
+                pos2 = uavs[pair[1]].state[0:3] 
+
+
             r = 0.1
             pr = pos1 + ((pos2-pos1)/2) + r*normVec((pos1-pos2))
             p0pr = pr - pload
@@ -334,7 +375,6 @@ def qlimit(uavs, payload, numofquads, tick):
            
             ns = np.cross(prp2, p0pr)           
             n_sol = np.cross(p0pr, ns)
-
             a_sol = 0
             uavs[pair[0]].hp_prev[0:3] = n_sol
             uavs[pair[0]].hp_prev[3]   = a_sol
@@ -413,7 +453,7 @@ def qp(uavs, payload, Ud, P_alloc, tick):
         return uavs, payload, mu_des
 
     except Exception as err:
-        print(f"Unexpected {err=}, {type(err)=}")
+        print("QP failed", f"Unexpected {err=}, {type(err)=}")
         print('mu_des: ', payload.mu_des_prev, '\n')
         mu_des = payload.mu_des_prev
         raise

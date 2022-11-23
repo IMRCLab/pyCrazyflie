@@ -27,7 +27,7 @@ class environment:
             ep = self.pd - p
             ed = self.vd - v
             F =  self.Kp@ep + self.Kd@ed 
-            # F = np.clip(F, np.array([-1,-1, -1]), np.array([1, 1, 1]))
+            F = np.clip(F, np.array([-0.5,-0.5, -0.5]), np.array([0.5, 0.5, 0.5]))
         return F
 
 class Payload:
@@ -103,12 +103,13 @@ class SharedPayload:
             self.lead = True
         else: 
             self.lead = False
-        self.controller = payload_params['payloadCtrl']['gains']['ctrlLee']
-        self.cablegains = payload_params['payloadCtrl']['gains']['cable']
-        self.ctrlType   = payload_params['payloadCtrl']['name']
-        self.offset     = np.array(payload_params['payloadCtrl']['offset'])
-        self.optimize   = payload_params['payloadCtrl']['optimize']['mode']
-        self.qp_tool    = payload_params['payloadCtrl']['optimize']['qp']
+        self.controller    = payload_params['payloadCtrl']['gains']['ctrlLee']
+        self.cablegains    = payload_params['payloadCtrl']['gains']['cable']
+        self.ctrlType      = payload_params['payloadCtrl']['name']
+        self.offset        = np.array(payload_params['payloadCtrl']['offset'])
+        self.optimize      = payload_params['payloadCtrl']['optimize']['mode']
+        self.qp_tool       = payload_params['payloadCtrl']['optimize']['qp']
+        self.downwashAware = payload_params['payloadCtrl']['optimize']['downwashAware']
         self.posFrload = np.empty((1,3))
         self.posFrloaddict = {}
 
