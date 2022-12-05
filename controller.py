@@ -434,7 +434,7 @@ def updateNeighborStates(state, id, uavs):
     return state
 
 def udpateHpsAndmu(id, uavs, leePayload):
-    // This is currently fixed for 3 uavs 2 hyperplanes
+    # This is currently fixed for 3 uavs 2 hyperplanes
     n1 = np.array([leePayload.n1.x, leePayload.n1.y, leePayload.n1.z])
     n2 = np.array([leePayload.n2.x, leePayload.n2.y, leePayload.n2.z])
     n3 = np.array([leePayload.n3.x, leePayload.n3.y, leePayload.n3.z])
