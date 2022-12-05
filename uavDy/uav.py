@@ -413,8 +413,13 @@ class UavModel:
         if self.drag ==  1:
             self.Kaero = np.diag([-9.1785e-7, -9.1785e-7, -10.311e-7]) 
         # for collision avoidance
-        self.hp_stack = np.empty((1,4))
-        self.hp_prev = np.zeros(4,)
+        self.hpStack   = {}
+        self.hp_prev = {}
+        self.hpNums  = uav_params['NumOfHplane']
+        for hpIds in range(self.hpNums):
+            self.hpStack[hpIds] = np.empty((1,4))
+            self.hp_prev[hpIds] = np.empty((1,4))
+
     def __str__(self):
         return "\nUAV object with physical parameters defined as follows: \n \n m = {} kg, l_arm = {} m \n \n{} {}\n I = {}{} [kg.m^2] \n {}{}\n\n Initial State = {}".format(self.m,self.d,'     ',self.I[0,:],' ',self.I[1,:],'     ',self.I[2,:], self.state)
         
@@ -536,10 +541,11 @@ class UavModel:
         fa   = wSum * self.Kaero @ np.transpose(R_IB) @ self.state[3:6]
         return fa
 
-    def addHp(self,hp):
+    def addHp(self, hpId, hp):
         coeffs = hp.coeffs()
-        self.hp_stack =  np.vstack((self.hp_stack, coeffs))
-        self.hp_prev = coeffs
+        self.hpStack[hpId]  =  np.vstack((self.hpStack[hpId], coeffs))
+        self.hp_prev[hpId]  =  coeffs
 
     def removeEmptyRow(self):
-        self.hp_stack = np.delete(self.hp_stack, 0,0)
+        for hpsIds in self.hpStack.keys():
+            self.hpStack[hpsIds] = np.delete(self.hpStack[hpsIds], 0,0)

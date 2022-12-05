@@ -120,33 +120,6 @@ def updateSensor(sensors, uav):
     sensors.gyro.z = np.degrees(uavState[12]) # deg/s
     return sensors
 
-def updateStateForPairs(pair, state, uavs):
-    """This function passes the current states for pairs to the controller"""
-    uavState = uavs[pair[0]].state
-    uavState2 = uavs[pair[1]].state
-    state.position.x = uavState[0]   # m
-    state.position.y = uavState[1]    # m
-    state.position.z = uavState[2]    # m
-    state.velocity.x = uavState[3]    # m/s
-    state.velocity.y = uavState[4]    # m/s
-    state.velocity.z = uavState[5]    # m/s
-    q_curr = np.array(uavState[6:10]).reshape((4,))
-    rpy_state  = rn.to_euler(q_curr,convention='xyz')
-    state.attitude.roll  = np.degrees(rpy_state[0])
-    state.attitude.pitch = np.degrees(-rpy_state[1])
-    state.attitude.yaw   = np.degrees(rpy_state[2])
-    state.attitudeQuaternion.w = q_curr[0]
-    state.attitudeQuaternion.x = q_curr[1]
-    state.attitudeQuaternion.y = q_curr[2]
-    state.attitudeQuaternion.z = q_curr[3]
-    state.position2.x = uavState2[0]
-    state.position2.y = uavState2[1]
-    state.position2.z = uavState2[2]
-    fullState = np.array([state.position.x,state.position.y,state.position.z, 
-                          state.velocity.x,state.velocity.y, state.velocity.z, 
-                          q_curr[0],q_curr[1],q_curr[2],q_curr[3], uavState[10],uavState[11],uavState[12]]).reshape((13,))
-    return state, fullState
-
 def updateState(state, uav):
     """This function passes the current states to the controller"""
     uavState = uav.state
@@ -168,6 +141,7 @@ def updateState(state, uav):
     fullState = np.array([state.position.x,state.position.y,state.position.z, 
                           state.velocity.x,state.velocity.y, state.velocity.z, 
                           q_curr[0],q_curr[1],q_curr[2],q_curr[3], uavState[10],uavState[11],uavState[12]]).reshape((13,))
+    
     return state, fullState
 
 def initializeState(uav_params):
@@ -309,7 +283,6 @@ def StatefromSharedPayload(id, payload, angState, lc, j):
         wl = payload.state[10:13] #wl of payload
         R0_dot = R0@uav.skew(wl)
         velq = payload.state[3:6] - lc * pdot + R0_dot @ posFrload
-        # print('posq: ', posq, 'velq: ', velq, 'posfrLoad', posFrload, 'qi', qi)
     uavState[0:3]  = posq
     uavState[3:6]  = velq
     uavState[6:10] = angState[0:4]
@@ -449,6 +422,47 @@ def initPLController(uavs, payload):
         controls[id] = control
     return controls, setpoint, sensors_, states 
 
+def updateNeighborStates(state, id, uavs):
+    i = 0
+    for id_ in uavs.keys():
+        if id != id_:
+            stateofId = uavs[id_].state
+            cffirmware.state_set_neighbor_position(state,  i, stateofId[0], stateofId[1], stateofId[2])
+            i+=1
+        else:
+            pass
+    return state
+
+def udpateHpsAndmu(id, uavs, leePayload):
+    // This is currently fixed for 3 uavs 2 hyperplanes
+    n1 = np.array([leePayload.n1.x, leePayload.n1.y, leePayload.n1.z])
+    n2 = np.array([leePayload.n2.x, leePayload.n2.y, leePayload.n2.z])
+    n3 = np.array([leePayload.n3.x, leePayload.n3.y, leePayload.n3.z])
+    n4 = np.array([leePayload.n4.x, leePayload.n4.y, leePayload.n4.z])
+    n5 = np.array([leePayload.n5.x, leePayload.n5.y, leePayload.n5.z])
+    n6 = np.array([leePayload.n6.x, leePayload.n6.y, leePayload.n6.z])
+    a  = 0
+    ids = list(uavs.keys())
+
+    hp1 = hyperplane(n1, a)
+    hp2 = hyperplane(n2, a)
+    hp3 = hyperplane(n3, a)
+    hp4 = hyperplane(n4, a)
+    hp5 = hyperplane(n5, a)
+    hp6 = hyperplane(n6, a)
+    
+    uavs[ids[0]].addHp(0 ,hp1)
+    uavs[ids[0]].addHp(1 ,hp2)
+    
+    uavs[ids[1]].addHp(0, hp3)
+    uavs[ids[1]].addHp(1, hp4)
+    
+    uavs[ids[2]].addHp(0, hp5)
+    uavs[ids[2]].addHp(1, hp6)
+
+    desVirtInp = leePayload.desVirtInp
+    return uavs, desVirtInp
+
 def updatePlstate(state, payload):
     plstate = payload.state
     state.payload_pos.x = plstate[0]   # m
@@ -507,6 +521,7 @@ def updatePlDesState(setpoint, payload, fulltraj):
         setpoint.attitude.pitch = 0
         setpoint.attitude.roll = 0
     return setpoint
+
 def setPlanes(leePayload, rpyplanes4robots, yaw4robots):
     leePayload.rpyPlane11.x = rpyplanes4robots[0][0][0]
     leePayload.rpyPlane11.y = rpyplanes4robots[0][0][1]
@@ -533,6 +548,7 @@ def setPlanes(leePayload, rpyplanes4robots, yaw4robots):
     leePayload.yawPlane31   = yaw4robots[2][0][0]
     leePayload.yawPlane32   = yaw4robots[2][1][0]
     return leePayload
+
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##        
 ##----------------------------------------------------------------------------------------------------------------------------------------------------------------##
 def main(args, animateOrPlotdict, params):
@@ -588,9 +604,15 @@ def main(args, animateOrPlotdict, params):
                 uavs, controls, setpoint, sensors_, states = initPLController(uavs, payload)
                 ids = list(uavs.keys())
                 pairsinIds = list(permutations(ids, 2))
-                Kp    = np.diag([100,100,100])
-                Kd    = np.diag([5,5,5])
+                Kp    = np.diag([0,0,0])
+                Kd    = np.diag([0,0,0])
                 floor = uav.environment(Kp, Kd, np.array([0, 0, 0]))
+                ids = list(uavs.keys())
+                allPairs = {}
+                for i in ids:
+                    idstmp = ids.copy()
+                    idstmp.remove(i)
+                    allPairs[i] = idstmp
                 # prepare hyperplanes in a list for all UAVs to use them
                 if payload.optimize:         
                     rpyplanes4robots = []
@@ -599,14 +621,16 @@ def main(args, animateOrPlotdict, params):
                         rpyplanes4robots.append(uavs[id].hyperrpy)
                         yaw4robots.append(uavs[id].hyperyaw)    
             elif payload.ctrlType == 'lee':
-                # print('zebb')
                 Kp    = np.diag([0,0,0])
                 Kd    = np.diag([0,0,0])
                 floor = uav.environment(Kp, Kd, np.array([0, 0, 0]))
                 controls, setpoint, sensors_, states = initPLController(uavs, payload)
                 ids = list(uavs.keys())
-                pairsinIds = list(permutations(ids, 2))
-
+                allPairs = {}
+                for i in ids:
+                    idstmp = ids.copy()
+                    idstmp.remove(i)
+                    allPairs[i] = idstmp
         else:
             controls, setpoints, sensors_, states, lees =  {}, {}, {}, {}, {} 
             for id in uavs.keys():
@@ -631,15 +655,15 @@ def main(args, animateOrPlotdict, params):
                 else: 
                     setpoint  = updatePlDesState(setpoint, payload, timeStamped_traj[1::,-1])
                     plref_state = np.array([setpoint.position.x, setpoint.position.y, setpoint.position.z, setpoint.velocity.x, setpoint.velocity.y, setpoint.velocity.z])
-            id2value = 0
             try:
-                ## Update states and  control input for each UAV 
-                for pair, id in zip(pairsinIds, uavs.keys()):
+                ## Update states and  control input for each UAV
+                desVirtInp = [] 
+                for id in uavs.keys():
                     if not payload.lead:
                         control, setpoint, sensors, state = controls[id], setpoints[id], sensors_[id], states[id]
                     elif payload.lead: 
                         control, sensors, state = controls[id], sensors_[id], states[id]
-                        
+
                     #initialize the controller and allocate current state (both sensor and state are the state)
                     # This is kind of odd and should be part of state
                     if tick <= int(tf_ms):
@@ -657,7 +681,8 @@ def main(args, animateOrPlotdict, params):
                     # update current state              
                     # update the state of the payload 
                     state   =  updatePlstate(state, payload)
-                    state, fullState = updateStateForPairs(pair, state, uavs)
+                    state, fullState = updateState(state, uavs[id])
+
                     ## If payload is not point mass, update its angular velocities
                     sensors  = updateSensor(sensors, uavs[id])
                     if not payload.pointmass:
@@ -669,34 +694,29 @@ def main(args, animateOrPlotdict, params):
                             try:
                                 uavs, payload, control, des_w, des_wd = cffirmware.controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, tick, j)
                                 ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)
-                            except Exception as err:
-                                print(f"Controller failed, Unexpected {err=}, {type(err)=}")
+                            except Exception as e:
+                                print('tick: ',tick)
+                                print(f"Controller failed, Unexpected {e=}, {type(e)=}")
+                                print('Error on line {}'.format(sys.exc_info()[-1].tb_lineno), type(e).__name__, e)
+                                print()
                                 raise
                                 break
-                                
+
                         elif payload.ctrlType == 'lee_firmware': # Firmware
                             leePayload = uavs[id].ctrlPayload
-                            leePayload.l = uavs[id].lc
                             leePayload.mass = uavs[id].m
-                            if payload.optimize:
-                                leePayload.value = id2value
                             try:
+                                state = updateNeighborStates(state, id, uavs)
                                 cffirmware.controllerLeePayload(leePayload, control, setpoint, sensors, state, tick)
-                            except Exception as err:
-                                print(f"Controller failed, Unexpected {err=}, {type(err)=}")
+                                uavs, desVirtInp_i = udpateHpsAndmu(id, uavs, leePayload)
+                                desVirtInp.append(desVirtInp_i)
+                            except Exception as e:
+                                print('tick: ',tick)
+                                print(f"Controller failed, Unexpected {e=}, {type(e)=}")
+                                print('Error on line {}'.format(sys.exc_info()[-1].tb_lineno), type(e).__name__, e)
+                                print()
                                 raise
                                 break
-                            payload.mu_des_prev = np.array([leePayload.mu1.x, leePayload.mu1.y, leePayload.
-                            mu1.z, leePayload.mu2.x, leePayload.mu2.y, leePayload.mu2.z]) 
-                            n_sol1 = np.array([leePayload.n1.x, leePayload.n1.y, leePayload.n1.z])
-                            a_sol1 = 0
-                            hp1 = hyperplane(n_sol1, a_sol1)
-                            uavs[pair[0]].addHp(hp1)
-                            n_sol2 = np.array([leePayload.n2.x, leePayload.n2.y, leePayload.n2.z])
-                            a_sol2 = 0
-                            hp2 = hyperplane(n_sol2, a_sol2)
-                            uavs[pair[1]].addHp(hp2)
-
                             des_w, des_wd  = np.zeros(3,), np.zeros(3,)
                             ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)
                     else:
@@ -712,14 +732,11 @@ def main(args, animateOrPlotdict, params):
                             cffirmware.controllerSJC(control, setpoint, sensors, state, tick)    
                             des_w, des_wd  = np.zeros(3,), np.zeros(3,)
                             ref_state = np.append(ref_state, np.array([des_w, des_wd]).reshape(6,), axis=0)        
-                    control_inp = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
+                    
+                    control_inp    = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
+                    ctrlInp        = np.array([control.u_all[0], control.u_all[1], control.u_all[2]])
                     uavs[id].state = StatefromSharedPayload(id, payload, uavs[id].state[6::], uavs[id].lc, j)
-                    ctrlInputs  = np.vstack((ctrlInputs, control_inp.reshape(1,4)))
-                    Re3 = rn.to_matrix(uavs[id].state[6:10])@np.array([0,0,1])
-                    if payload.lead:
-                        ctrlInp  = np.array([control.u_all[0], control.u_all[1], control.u_all[2]])
-                    else: 
-                        ctrlInp  = control_inp[0]*Re3 
+                    ctrlInputs     = np.vstack((ctrlInputs, control_inp.reshape(1,4)))
                     payload.stackCtrl(ctrlInp.reshape(1,3))  
                     if not payload.lead:
                         controls[id]  = control
@@ -730,9 +747,10 @@ def main(args, animateOrPlotdict, params):
                         controls[id]  = control
                         sensors_[id]  = sensors
                         states[id]    = state
-                    uavs[id].stackStandCtrl(uavs[id].state, control_inp, ref_state)                   
+                    uavs[id].stackStandCtrl(uavs[id].state, control_inp, ref_state)
                     j+=3
-                    id2value += 1
+                if payload.ctrlType == 'lee_firmware':
+                    payload.mu_des_prev = np.array(desVirtInp).reshape((3*payload.numOfquads,))
                 payload.stackmuDes(payload.mu_des_prev)
                 payload.cursorUp() 
                 # Evolve the payload states
@@ -741,29 +759,79 @@ def main(args, animateOrPlotdict, params):
                     payload.stackStateandRef(plref_state)
                 else:
                     payload.stackState()     
-            except Exception as err:
-                    print(f"Failure in {err=}, {type(err)=}")
-                    raise
-                    break
-                
+            except Exception as e:
+                print(f"Simulation failed in {e=}, {type(e)=}")
+                print('Error on line {}'.format(sys.exc_info()[-1].tb_lineno), type(e).__name__, e)
+                print()
+                break 
+                raise
+
         for id in uavs.keys():
             uavs[id].cursorUp()
             uavs[id].removeEmptyRow()
+        
         payload.cursorPlUp()
         payload.removemu()
-        ## Animate or plot based on flags
+        splitStackMu = np.hsplit(payload.mu_des_stack,payload.numOfquads)
+        hpsDict = {}
+        mufilePathsperId = []
+        muDict = {}
+        stDict = {}
+
+        # Payload csv file
         with open("../visualization-examples/payload.csv", "w") as f:
             np.savetxt(f, payload.plFullState, delimiter=",")
 
-        with open("../visualization-examples/mu.csv", "w") as f:
-            np.savetxt(f, payload.mu_des_stack, delimiter=",")
+        # mu per robot csv file
+        for id, stackMu in zip(uavs.keys(), range(len(splitStackMu))):
+            mufilePathsperId = []
+            uavID = id.replace("uav_", "")
+            fName = "mu_" + uavID + ".csv"
+            mufilepath = "../visualization-examples/"+ fName           
+            with open(mufilepath, "w") as f:
+                np.savetxt(f, splitStackMu[stackMu], delimiter=",")
             
+            muDict[uavID] = fName
+    
+        # state per robot csv
         for id in uavs.keys():
-            with open("../visualization-examples/" + id + ".csv", "w") as f:
-                np.savetxt(f, uavs[id].fullState, delimiter=",")
-            with open("../visualization-examples/" + id+"_hps"+ ".csv", "w") as f:
-                np.savetxt(f, uavs[id].hp_stack, delimiter=",")
+            uavID = id.replace("uav_", "")
+            fName = uavID + ".csv"
 
+            with open("../visualization-examples/" + fName, "w") as f:
+                np.savetxt(f, uavs[id].fullState, delimiter=",")    
+            stDict[uavID] = fName
+            # hps per robot csv
+            hpsfilePathsperId = []           
+            for hpPerId in uavs[id].hpStack.keys(): 
+                fName = "hp" + str(hpPerId+1) + "_" + uavID + ".csv"               
+                hpfilepath = "../visualization-examples/" + fName
+                hpsfilePathsperId.append(fName)
+                with open(hpfilepath, "w") as f:
+                    np.savetxt(f, uavs[id].hpStack[hpPerId][::payload.numOfquads,:], delimiter=",")
+       
+            hpsDict[uavID] = hpsfilePathsperId
+
+        ## write the config file for visualization
+        configData = {}
+        configData['robots'] = {}
+        configData['payload'] = 'payload.csv'
+        Ids = []
+        for id in uavs.keys():
+            uavID = id.replace("uav_", "")
+            Ids.append(uavID)
+    
+        for id in Ids:
+            robot        = {}
+            robot['state'] = stDict[id]
+            robot['hps']   = hpsDict[id]
+            robot['mu']    = muDict[id] 
+            configData['robots'][id] = robot
+
+        with open('../visualization-examples/configData.yaml', 'w') as f:
+            yaml.dump(configData, f)
+        
+        ## Animate or plot based on flags
         animateOrPlot(uavs, payload, animateOrPlotdict, filename, tf_sim, shared, sample)
 
     else:
@@ -836,4 +904,3 @@ if __name__ == '__main__':
         main(args, animateOrPlotdict, params)
     except ImportError as imp:
         print(imp)
-        print('Please export crazyflie-firmware/ to your PYTHONPATH')
