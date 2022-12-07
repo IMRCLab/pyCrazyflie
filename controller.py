@@ -9,9 +9,10 @@ import time
 import argparse
 import sys
 from itertools import permutations, combinations, chain
-
 np.set_printoptions(linewidth=np.inf)
 np.set_printoptions(suppress=True)
+import cffirmware
+import yaml
 
 class hyperplane:
     def __str__(self):
@@ -889,7 +890,6 @@ def main(args, animateOrPlotdict, params):
 
 if __name__ == '__main__':
     try: 
-        import cffirmware
         parser = argparse.ArgumentParser()
         parser.add_argument('filename', type=str, help="Name of the CSV file in trajectoriescsv directory")
         parser.add_argument('--animate', default=False, action='store_true', help='Set true to save a gif in Videos directory')
@@ -898,7 +898,6 @@ if __name__ == '__main__':
         args   = parser.parse_args()   
         animateOrPlotdict = {'animate':args.animate, 'plot':args.plot}
     
-        import yaml
         with open('config/initialize.yaml') as f:
             params = yaml.load(f, Loader=yaml.FullLoader)
         main(args, animateOrPlotdict, params)
