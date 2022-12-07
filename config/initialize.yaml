@@ -108,11 +108,11 @@ RobotswithPayload:
     wl          : [0,   0,    0]
     refTrajPath: 'trajectoriescsv/hover_01.csv' #linTraj_traj.csv #cirTraj1.csv
     payloadCtrl:
-      name: 'lee_firmware'
+      name: 'lee'
       payloadLead: 'enabled'
       optimize:
         mode: 'enabled'
-        qp  : 'cvxpy'
+        qp  : 'osqp'
         downwashAware: true
       offset: [0.0, 0.0, 0.0]
       gains:
@@ -164,7 +164,7 @@ RobotswithPayload:
       mxTh : 12000.0  #maximum thrust in [g] per motor
       refTrajPath  : ' ' #'trajectoriescsv/figure8.csv' 
       controller  : 
-        name: 'lee_firmware' # lee_firmware # lee, sjc
+        name: 'lee' # lee_firmware # lee, sjc
         kpx  : 9.0 #10  
         kpy  : 9.0
         kpz  : 9.0
@@ -276,7 +276,7 @@ RobotswithPayload:
         kiy  : 0.02
         kiz  : 0.02     
       l_c  : 0.8 #0.754 #0.707 # Length of cable
-      q_dg : [25, 0, 420]  # [0, 0, 0]  # Initial angle between UAV and payload
+      q_dg : [30, 0, 420]  # [0, 0, 0]  # Initial angle between UAV and payload
       qd   : [0, 0, 0]  # Initial angle derivates between UAV and payload (i.e., of cables)
       pos_fr_payload: [0.2241, -0.1294, 0] #[-0.1294, 0.2241, 0] #position vector of the cable on the load (i.e., zero vector means a point mass)
       initConditions:
@@ -298,5 +298,5 @@ environment:
     Kd: [0,0,0]
 ## Simulation parameters 
 dt : 1e-3 # time step
-simtime: 1.022e3 #  This is added (or subtracted) from the total trajectory time defined in the csv file
+simtime: 2.022e3 #  This is added (or subtracted) from the total trajectory time defined in the csv file
 sample: 250 #frames per second
