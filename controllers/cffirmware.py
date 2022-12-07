@@ -263,10 +263,10 @@ def torqueCtrlwPayload(uavModel, fi, payload, setpoint, tick):
 
     return torques, des_w, des_wd
 
-def parallelComp(virtualInp, uavModel, payload, j):
+def parallelComp(desAcc, virtualInp, uavModel, payload, j):
     ## This only includes the point mass model
     grav = np.array([0,0,-9.81])
-    acc_ = payload.accl[0:3] #(payload.state[3:6] - payload.prevSt[3:6])/payload.dt
+    acc_ = desAcc.reshape(3,) #(payload.state[3:6] - payload.prevSt[3:6])/payload.dt
     acc0 = acc_ - grav
     m   = uavModel.m
     l = uavModel.lc
@@ -276,10 +276,10 @@ def parallelComp(virtualInp, uavModel, payload, j):
     u_parallel = virtualInp + m*l*(np.dot(wi, wi))*qi  +  m*qiqiT@acc0
     return u_parallel
 
-def perpindicularComp(desVirtInp, uavModel, payload, kq, kw, ki, j, tick):
+def perpindicularComp(desAcc, desVirtInp, uavModel, payload, kq, kw, ki, j, tick):
     ## This only includes the point mass model
     grav = np.array([0,0,-9.81])
-    acc_ = payload.accl[0:3] #(payload.state[3:6] - payload.prevSt[3:6])/payload.dt
+    acc_ = desAcc.reshape(3,) #payload.accl[0:3] #(payload.state[3:6] - payload.prevSt[3:6])/payload.dt
     acc0 = acc_ - grav
     qdi    = - desVirtInp/ np.linalg.norm(desVirtInp)
     if tick == 0: 
@@ -307,7 +307,7 @@ def perpindicularComp(desVirtInp, uavModel, payload, kq, kw, ki, j, tick):
     payload.wdi_prevdict[uavModel.id] = wdi.copy()
 
     qiqiT = qi.reshape((3,1))@(qi.T).reshape((1,3))
-    u_perp = m * l  * uav.skew(qi) @ (-kq @ eq - kw @ ew- np.dot(qi, wdi)*qidot - skewqi2@wdidot) - m * skewqi2 @ acc0 
+    u_perp = m * l  * uav.skew(qi) @ (-kq @ eq - kw @ ew- np.dot(qi, wdi)*qidot) - m * skewqi2 @ acc0 
     return u_perp
 
 def normVec(n):
@@ -573,8 +573,8 @@ def controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, t
     qiqiT = qi.reshape((3,1))@(qi.T).reshape((1,3))
     virtualInp =  qiqiT @ desVirtInp  
     
-    u_parallel = parallelComp(virtualInp, uavModel, payload, j)
-    u_perpind  = perpindicularComp(desVirtInp, uavModel, payload, kq, kwc, ki, j, tick)
+    u_parallel = parallelComp(desAcc,virtualInp, uavModel, payload, j)
+    u_perpind  = perpindicularComp(desAcc, desVirtInp, uavModel, payload, kq, kwc, ki, j, tick)
     control.u_all = u_parallel + u_perpind
     torquesTick, des_w, des_wd = torqueCtrlwPayload(uavModel, control.u_all, payload, setpoint, tick*1e-3)
     
