@@ -331,7 +331,7 @@ class SharedPayload:
             raise
         self.prevSt = self.state.copy()
         self.getNextState()
-        self.ctrlInp = np.array(np.empty((1,3)))
+        self.ctrlInp = np.zeros((1,3))
 
         m, k = 0 , self.plStateSize
         for id in uavs.keys():
