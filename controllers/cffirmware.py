@@ -328,10 +328,7 @@ def qlimit(uavs, payload, numofquads, tick):
             idstmp = ids.copy()
             idstmp.remove(i)
             allPairs[i] = idstmp
-        # print(allPairs.items(), '\n', uavs.keys())
-
         for pairs, id in zip(allPairs.items(), uavs.keys()):
-            # print(pairs, id)
             toPairwith = pairs[1]
             numsofHplaneperId = uavs[id].hpNums 
             for hpIds in uavs.keys():
@@ -365,10 +362,9 @@ def qlimit(uavs, payload, numofquads, tick):
 
                     else:
                         angle_1 = np.pi/2
-                    angle_2   = np.pi - (angle_12 + angle_1)            
+                    angle_2   = np.pi - (angle_12 + angle_1) 
                     normpos2_r_new   = np.linalg.norm(pos1_r)*(np.sin(angle_1) /  np.sin(angle_2))
                     pos2_new    = pload + normpos2_r_new * normVec(pos2_r)
-
                     pos1 = uavs[pair[0]].state[0:3]
                     pos2 = uavs[pair[1]].state[0:3]
                     if l2 >= l1:
@@ -378,7 +374,7 @@ def qlimit(uavs, payload, numofquads, tick):
                 else:
                     pos1 = uavs[pair[0]].state[0:3] 
                     pos2 = uavs[pair[1]].state[0:3] 
-                r = 0.05
+                r = 0.15
                 pr = pos1 + ((pos2-pos1)/2) + r*normVec((pos1-pos2))
                 p0pr = pr - pload
                 prp2 = pos2 - pr
@@ -449,6 +445,7 @@ def qp(uavs, payload, Ud, P, tick):
             mu_des = mu_des.value 
         elif payload.qp_tool == 'osqp':
             A     = sparse.vstack((P, sparse.csc_matrix(Ain)), format='csc') 
+            # print(A)
             Q     = sparse.csc_matrix(Q)
             q     = np.zeros(size,)
             l     = np.hstack([Ud, -np.inf*np.ones(Ain.shape[0],)])
@@ -578,8 +575,7 @@ def controllerLeePayload(uavs, id, payload, control, setpoint, sensors, state, t
     
     u_parallel = parallelComp(virtualInp, uavModel, payload, j)
     u_perpind  = perpindicularComp(desVirtInp, uavModel, payload, kq, kwc, ki, j, tick)
-    
-    control.u_all = u_parallel + u_perpind    
+    control.u_all = u_parallel + u_perpind
     torquesTick, des_w, des_wd = torqueCtrlwPayload(uavModel, control.u_all, payload, setpoint, tick*1e-3)
     
     control.thrustSI = np.linalg.norm(control.u_all)
