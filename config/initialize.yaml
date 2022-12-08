@@ -108,7 +108,7 @@ RobotswithPayload:
     wl          : [0,   0,    0]
     refTrajPath: 'trajectoriescsv/hover_01.csv' #linTraj_traj.csv #cirTraj1.csv
     payloadCtrl:
-      name: 'lee'
+      name: 'lee_firmware'
       payloadLead: 'enabled'
       optimize:
         mode: 'enabled'

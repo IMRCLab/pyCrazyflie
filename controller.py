@@ -644,7 +644,7 @@ def main(args, animateOrPlotdict, params):
                 setpoints[id] = setpoint
                 sensors_[id]  = sensors
                 states[id]    = state 
-
+         # fullCtrlInps = []
         for tick in range(0, int(tf_sim)+1):
             j = plStSize
             ctrlInputs = np.zeros((1,4))
@@ -658,7 +658,7 @@ def main(args, animateOrPlotdict, params):
                     plref_state = np.array([setpoint.position.x, setpoint.position.y, setpoint.position.z, setpoint.velocity.x, setpoint.velocity.y, setpoint.velocity.z])
             try:
                 ## Update states and  control input for each UAV
-                desVirtInp = [] 
+               # desVirtInp = []
                 for id in uavs.keys():
                     if not payload.lead:
                         control, setpoint, sensors, state = controls[id], setpoints[id], sensors_[id], states[id]
@@ -736,6 +736,7 @@ def main(args, animateOrPlotdict, params):
                     
                     control_inp    = np.array([control.thrustSI, control.torque[0], control.torque[1], control.torque[2]])
                     ctrlInp        = np.array([control.u_all[0], control.u_all[1], control.u_all[2]])
+                    # fullCtrlInps.append(list(ctrlInp))
                     uavs[id].state = StatefromSharedPayload(id, payload, uavs[id].state[6::], uavs[id].lc, j)
                     ctrlInputs     = np.vstack((ctrlInputs, control_inp.reshape(1,4)))
                     payload.stackCtrl(ctrlInp.reshape(1,3))  
@@ -834,7 +835,7 @@ def main(args, animateOrPlotdict, params):
         
         ## Animate or plot based on flags
         animateOrPlot(uavs, payload, animateOrPlotdict, filename, tf_sim, shared, sample)
-
+        # return uavs, payload, fullCtrlInps, u_par, u_per
     else:
         for id in uavs.keys():
             #initialize the controller and allocate current state (both sensor and state are the state)
