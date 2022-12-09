@@ -4,8 +4,7 @@ __pycache__
 *.pdf
 *.gif
 *.csv
-firmwaremake.sh
-makebindings.sh
+*.sh
 logScripts/*.pdf
 logScripts/logs/
 logScripts/data/

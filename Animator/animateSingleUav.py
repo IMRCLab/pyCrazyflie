@@ -406,6 +406,7 @@ class PlotandAnimate:
         self.fig = fig
         self.ax  = ax
         self.ax.view_init(30,-35)
+        # self.ax.view_init(azim=0,elev=0)
         self.shared = shared
     def initializeQuad(self, uav):    
         # Create the lines and vectors to draw body and desired frames
@@ -431,8 +432,8 @@ class PlotandAnimate:
     def setlimits(self):
         # This method finds the maximum value in the x-y-z actual states for the UAV(s) and sets the limits of the figure accordingly   
         # edge: adds extra space for the figure 
-        edge_ = -0.1
-        edge  = 0.1
+        edge_ = -0.4
+        edge  = 0.4
         maxs_  = []
         for uav in self.uavModels.values():
             max_x = max(uav.fullState[:,0])
@@ -495,7 +496,7 @@ class PlotandAnimate:
         return armI1, armI2, _armI1, _armI2
 
     def drawActvsRefTraj(self, x, y, z, xref, yref, zref):
-            self.ax.plot3D(x, y, z, 'k-.',lw=1.5,label="Actual Trajectory")
+            # self.ax.plot3D(x, y, z, 'k-.',lw=1.5,label="Actual Trajectory")
             self.ax.plot3D(xref, yref ,zref,c='darkgreen',ls='--',lw=1.5,label="Reference Trajectory")
             # self.ax.legend()
 
@@ -533,6 +534,15 @@ class PlotandAnimate:
         c_st = np.array([x,y,z])
         c_en = np.array([xl,yl,zl])
         self.ax.plot3D(np.linspace(c_st[0], c_en[0]), np.linspace(c_st[1], c_en[1]), np.linspace(c_st[2], c_en[2]), 'darkblue',lw=2)
+    
+    def drawPlanes(self, hps):
+        for i in range(len(hps)):
+            n = hps[i,0:3]
+            a,b,c = n[0],n[1],n[2]
+            d = hps[i,3]
+            x,z = np.mgrid[-0.1:0.1:0.01,-1:1:0.01]
+            y = -(a*x + c*z + d)/b
+            self.ax.plot_surface(x,y,z, alpha=0.3)
 
     def animate(self,i):
         self.ax.cla()
@@ -546,8 +556,9 @@ class PlotandAnimate:
             if self.uavModel.pload:
                 if self.shared:
                     self.payload = self.payloads 
-                if self.payload.lead:
-                    self.reference_state = self.payload.plref_state[::self.sample, :]
+                    if self.payload.lead:
+                        self.reference_state = self.payload.plref_state[::self.sample, :]
+                        hps = self.uavModel.hp_stack
                 else:
                     if self.shared: 
                         self.payload     = self.payloads
@@ -576,6 +587,7 @@ class PlotandAnimate:
                         self.drawPlTraj(xl, yl, zl)
                         r = 0.08
                         xsp, ysp, zsp = Sphere(xl, yl, zl, r)
+                        self.drawPlanes(hps)
                         self.ax.plot_surface(xl[i]+xsp, yl[i]+ysp, zl[i]+zsp, cmap=plt.cm.YlGnBu_r)
                        
                 else:    
