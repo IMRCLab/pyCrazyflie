@@ -658,7 +658,7 @@ def main(args, animateOrPlotdict, params):
                     plref_state = np.array([setpoint.position.x, setpoint.position.y, setpoint.position.z, setpoint.velocity.x, setpoint.velocity.y, setpoint.velocity.z])
             try:
                 ## Update states and  control input for each UAV
-               # desVirtInp = []
+                desVirtInp = []
                 for id in uavs.keys():
                     if not payload.lead:
                         control, setpoint, sensors, state = controls[id], setpoints[id], sensors_[id], states[id]
