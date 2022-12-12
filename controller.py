@@ -827,9 +827,11 @@ def main(args, animateOrPlotdict, params):
             robot        = {}
             robot['state'] = stDict[id]
             robot['hps']   = hpsDict[id]
-            robot['mu']    = muDict[id] 
+            robot['mu']    = muDict[id]
+            if not payload.pointmass:
+                att = payload.posFrloaddict['uav_'+id]
+                robot['att']   = att.tolist()
             configData['robots'][id] = robot
-
         with open('../visualization-examples/configData.yaml', 'w') as f:
             yaml.dump(configData, f)
         
